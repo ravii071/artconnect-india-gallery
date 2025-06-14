@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 type AuthMode = "sign-in" | "sign-up";
 
 const Auth: React.FC = () => {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, signInWithGoogle } = useAuth();
   const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,6 +20,7 @@ const Auth: React.FC = () => {
   const [fullName, setFullName] = useState("");
   const [artType, setArtType] = useState(""); // For artists
   const [district, setDistrict] = useState(""); // For artists
+  const [phone, setPhone] = useState(""); // For artists
 
   // UI/UX
   const [error, setError] = useState<string | null>(null);
@@ -55,9 +56,11 @@ const Auth: React.FC = () => {
         setError("Name is required.");
         return;
       }
-      if (userType === "artist" && (!artType.trim() || !district.trim())) {
-        setError("Please provide your Art Type and District.");
-        return;
+      if (userType === "artist") {
+        if (!artType.trim() || !district.trim() || !phone.trim()) {
+          setError("Please provide Art Type, District, and Phone.");
+          return;
+        }
       }
 
       setLoading(true);
@@ -71,23 +74,17 @@ const Auth: React.FC = () => {
       }
 
       // 2. After signup, update profile with extra info (and create artist_profile)
-      // Supabase Auth will trigger the row insert for `profiles` automatically.
-      // But we need to update with full_name, user_type, etc.
-
-      // Wait for user to exist (small delay for Supabase signup process)
       setTimeout(async () => {
         const { data: user } = await supabase.auth.getUser();
         if (!user?.user) return;
 
         const user_id = user.user.id;
-
         // Update profiles with full name and user_type
         await supabase
           .from("profiles")
           .update({ full_name: fullName, user_type: userType })
           .eq("id", user_id);
-
-        // If artist, also ensure artist_profiles row exists
+        // If artist, also ensure artist_profiles row exists & update essentials
         if (userType === "artist") {
           await supabase
             .from("artist_profiles")
@@ -96,8 +93,8 @@ const Auth: React.FC = () => {
                 id: user_id,
                 specialty: artType,
                 location: district,
+                phone: phone,
                 bio: "",
-                phone: "",
                 portfolio_images: [],
               },
               { onConflict: "id" }
@@ -107,8 +104,6 @@ const Auth: React.FC = () => {
         setLoading(false);
         navigate("/");
       }, 1200);
-
-      // Show a toast or message: "Check your email to confirm registration." (handled in AuthContext)
     }
   };
 
@@ -127,6 +122,20 @@ const Auth: React.FC = () => {
             onClick={() => setAuthMode("sign-up")}
           >Sign Up</Button>
         </div>
+        {/* Google Sign In */}
+        {authMode === "sign-in" && (
+          <Button 
+            variant="outline" 
+            className="w-full mb-4 flex items-center justify-center"
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              signInWithGoogle().finally(() => setLoading(false));
+            }}>
+            <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google Icon" className="h-5 w-5 mr-2" />
+            Sign in with Google
+          </Button>
+        )}
 
         <form className="flex flex-col gap-4" onSubmit={handleAuth}>
           <Input
@@ -191,9 +200,15 @@ const Auth: React.FC = () => {
                     disabled={loading}
                   />
                   <Input
-                    placeholder="District"
+                    placeholder="District (e.g. Mumbai, Delhi)"
                     value={district}
                     onChange={e => setDistrict(e.target.value)}
+                    disabled={loading}
+                  />
+                  <Input
+                    placeholder="Phone"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
                     disabled={loading}
                   />
                 </>
