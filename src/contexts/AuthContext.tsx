@@ -61,14 +61,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               .single();
             
             console.log('Profile data:', profileData);
+            
             if (profileData) {
               setProfile({
                 ...profileData,
                 user_type: profileData.user_type as 'artist' | 'client'
               });
 
-              // Check if this is a new artist user who needs to complete profile
-              if (profileData.user_type === 'artist' && event === 'SIGNED_IN') {
+              // Handle new user setup for Google OAuth
+              if (event === 'SIGNED_IN' && !profileData.user_type) {
+                // Check if there's a pending user type from localStorage (for Google signup)
+                const pendingUserType = localStorage.getItem('pendingUserType');
+                
+                if (pendingUserType) {
+                  // Update profile with the pending user type
+                  await supabase
+                    .from('profiles')
+                    .update({ user_type: pendingUserType })
+                    .eq('id', session.user.id);
+                  
+                  // If artist, create artist profile and redirect to complete profile
+                  if (pendingUserType === 'artist') {
+                    await supabase
+                      .from('artist_profiles')
+                      .upsert(
+                        {
+                          id: session.user.id,
+                          specialty: '',
+                          location: '',
+                          phone: '',
+                          bio: '',
+                          portfolio_images: [],
+                        },
+                        { onConflict: 'id' }
+                      );
+                    
+                    localStorage.removeItem('pendingUserType');
+                    setTimeout(() => {
+                      window.location.href = '/complete-profile';
+                    }, 1000);
+                    return;
+                  } else {
+                    localStorage.removeItem('pendingUserType');
+                    setTimeout(() => {
+                      window.location.href = '/';
+                    }, 1000);
+                    return;
+                  }
+                }
+              }
+
+              // Check if this is an artist who needs to complete profile
+              if (profileData.user_type === 'artist' && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
                 const { data: artistProfile } = await supabase
                   .from('artist_profiles')
                   .select('specialty, location, phone')
@@ -77,10 +121,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                 // If artist profile doesn't exist or is incomplete, redirect to complete profile
                 if (!artistProfile || !artistProfile.specialty || !artistProfile.location || !artistProfile.phone) {
-                  setTimeout(() => {
-                    window.location.href = '/complete-profile';
-                  }, 1000);
+                  if (window.location.pathname !== '/complete-profile') {
+                    setTimeout(() => {
+                      window.location.href = '/complete-profile';
+                    }, 1000);
+                  }
+                  return;
                 }
+              }
+
+              // If we're on auth page and user is fully set up, redirect to home
+              if (window.location.pathname === '/auth') {
+                setTimeout(() => {
+                  window.location.href = '/';
+                }, 1000);
+              }
+            } else if (session?.user && event === 'SIGNED_IN') {
+              // No profile exists, this is likely a new Google user
+              // Check for pending user type
+              const pendingUserType = localStorage.getItem('pendingUserType');
+              
+              if (!pendingUserType) {
+                // If no pending user type, redirect to auth to select
+                setTimeout(() => {
+                  window.location.href = '/auth';
+                }, 1000);
               }
             }
           }, 0);
@@ -151,7 +216,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithGoogle = async () => {
-    const redirectUrl = `${window.location.origin}/auth`;
+    const redirectUrl = `${window.location.origin}/`;
     
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
