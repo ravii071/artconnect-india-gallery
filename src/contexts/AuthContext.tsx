@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -148,18 +149,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setLoading(false);
               return;
             }
-          } else {
-            // No profileData: set loading to false
-            setLoading(false);
-            return;
           }
+          
+          setLoading(false);
+        } else if (session?.user && processedUsers.current.has(session.user.id)) {
+          // User already processed, just clear loading
+          setLoading(false);
         } else if (!session?.user) {
           setProfile(null);
           processedUsers.current.clear();
           setLoading(false);
-          return;
         } else {
-          // Some unexpected case - always clear loading
+          // Fallback case
           setLoading(false);
         }
       }
