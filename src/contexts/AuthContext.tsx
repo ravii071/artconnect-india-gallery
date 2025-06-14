@@ -66,6 +66,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 ...profileData,
                 user_type: profileData.user_type as 'artist' | 'client'
               });
+
+              // Check if this is a new artist user who needs to complete profile
+              if (profileData.user_type === 'artist' && event === 'SIGNED_IN') {
+                const { data: artistProfile } = await supabase
+                  .from('artist_profiles')
+                  .select('specialty, location, phone')
+                  .eq('id', session.user.id)
+                  .maybeSingle();
+
+                // If artist profile doesn't exist or is incomplete, redirect to complete profile
+                if (!artistProfile || !artistProfile.specialty || !artistProfile.location || !artistProfile.phone) {
+                  setTimeout(() => {
+                    window.location.href = '/complete-profile';
+                  }, 1000);
+                }
+              }
             }
           }, 0);
         } else {
