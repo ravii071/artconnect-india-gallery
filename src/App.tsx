@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,6 +12,7 @@ import Booking from "./pages/Booking";
 import Search from "./pages/Search";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
+import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +27,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/artist/:id" element={<ArtistProfile />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/profile" element={<ProtectedRoute requireAuth={true}><Profile /></ProtectedRoute>} />
             <Route 
               path="/booking/:id" 
               element={
@@ -44,7 +45,6 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

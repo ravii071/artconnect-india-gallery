@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -6,39 +5,51 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Star, MapPin, Calendar, Heart, Phone, Mail, Share2, ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const ArtistProfile = () => {
   const { id } = useParams();
   const [isFollowing, setIsFollowing] = useState(false);
+  const [artist, setArtist] = useState<any>(null);
+  const { user, profile } = useAuth();
 
-  // Mock artist data - will be replaced with real data later
-  const artist = {
-    id: 1,
-    name: "Priya Sharma",
-    specialty: "Mehendi Artist",
-    location: "Mumbai, Maharashtra",
-    rating: 4.9,
-    reviews: 127,
-    followers: "2.5k",
-    following: "450",
-    bio: "Professional mehendi artist with 8+ years of experience. Specializing in bridal mehendi, Arabic designs, and contemporary patterns. Available for weddings, festivals, and special occasions.",
-    image: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-    phone: "+91 98765 43210",
-    email: "priya.mehendi@email.com",
-    portfolio: [
-      "https://images.unsplash.com/photo-1583221053175-a6a97bcb5b6b?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1583221053175-a6a97bcb5b6b?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80"
-    ],
-    services: [
-      { id: 1, name: "Bridal Mehendi", price: "₹3,000", duration: "3-4 hours" },
-      { id: 2, name: "Arabic Design", price: "₹800", duration: "1-2 hours" },
-      { id: 3, name: "Simple Pattern", price: "₹500", duration: "30-45 mins" }
-    ]
-  };
+  useEffect(() => {
+    // Get artist_profile for this id
+    if (id) {
+      supabase
+        .from("artist_profiles")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle()
+        .then(async ({ data }) => {
+          if (data) {
+            // Get general profile info too
+            const { data: userProfile } = await supabase
+              .from("profiles")
+              .select("full_name, avatar_url")
+              .eq("id", id)
+              .maybeSingle();
+            setArtist({
+              ...data,
+              ...userProfile,
+            });
+          }
+        });
+    }
+  }, [id]);
+
+  if (!artist) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-xl text-gray-500">
+        Loading artist profile...
+      </div>
+    );
+  }
+
+  // Only allow signed-in users to interact (follow, book, share)
+  const canInteract = !!user && !!profile;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-purple-50">
@@ -53,18 +64,24 @@ const ArtistProfile = () => {
               </Button>
             </Link>
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-pink-500 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-sm">AC</span>
+              <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-pink-500 rounded-full flex items-center justify-center overflow-hidden">
+                {artist.avatar_url ? (
+                  <img src={artist.avatar_url} alt="avatar" className="w-8 h-8 object-cover rounded-full" />
+                ) : (
+                  <span className="text-white font-bold text-sm">AC</span>
+                )}
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">
                 ArtConnect
               </span>
             </div>
           </div>
-          <Button variant="outline" size="sm">
-            <Share2 className="w-4 h-4 mr-2" />
-            Share
-          </Button>
+          {canInteract && (
+            <Button variant="outline" size="sm">
+              <Share2 className="w-4 h-4 mr-2" />
+              Share
+            </Button>
+          )}
         </div>
       </header>
 
@@ -75,12 +92,12 @@ const ArtistProfile = () => {
             <Card className="p-6">
               <div className="flex flex-col md:flex-row gap-6">
                 <img 
-                  src={artist.image} 
-                  alt={artist.name}
+                  src={artist.avatar_url || artist.image || "/placeholder.svg"} 
+                  alt={artist.full_name}
                   className="w-32 h-32 rounded-full object-cover mx-auto md:mx-0"
                 />
                 <div className="flex-1 text-center md:text-left">
-                  <h1 className="text-3xl font-bold mb-2">{artist.name}</h1>
+                  <h1 className="text-3xl font-bold mb-2">{artist.full_name}</h1>
                   <Badge className="mb-3 bg-gradient-to-r from-orange-500 to-pink-500">
                     {artist.specialty}
                   </Badge>
@@ -110,16 +127,19 @@ const ArtistProfile = () => {
                     <Button 
                       className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
                       onClick={() => setIsFollowing(!isFollowing)}
+                      disabled={!canInteract}
                     >
                       <Heart className={`w-4 h-4 mr-2 ${isFollowing ? 'fill-current' : ''}`} />
                       {isFollowing ? 'Following' : 'Follow'}
                     </Button>
-                    <Link to={`/booking/${artist.id}`}>
-                      <Button variant="outline" className="w-full">
-                        <Calendar className="w-4 h-4 mr-2" />
-                        Book Appointment
-                      </Button>
-                    </Link>
+                    {canInteract && (
+                      <Link to={`/booking/${artist.id}`}>
+                        <Button variant="outline" className="w-full">
+                          <Calendar className="w-4 h-4 mr-2" />
+                          Book Appointment
+                        </Button>
+                      </Link>
+                    )}
                   </div>
                 </div>
               </div>
@@ -163,12 +183,23 @@ const ArtistProfile = () => {
         <Card className="p-6">
           <h3 className="font-semibold text-xl mb-6">Portfolio</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {artist.portfolio.map((img, index) => (
-              <div key={index} className="aspect-square rounded-lg overflow-hidden group cursor-pointer">
+            {/* Images */}
+            {artist.portfolio_images && artist.portfolio_images.map((img: string, index: number) => (
+              <div key={"img" + index} className="aspect-square rounded-lg overflow-hidden group cursor-pointer">
                 <img 
                   src={img} 
-                  alt={`Portfolio ${index + 1}`}
+                  alt={`Portfolio Image ${index + 1}`}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+              </div>
+            ))}
+            {/* Videos */}
+            {artist.portfolio_videos && artist.portfolio_videos.map((vid: string, index: number) => (
+              <div key={"vid" + index} className="aspect-square rounded-lg overflow-hidden group cursor-pointer bg-black flex items-center justify-center">
+                <video 
+                  src={vid} 
+                  controls
+                  className="w-full h-full object-cover"
                 />
               </div>
             ))}
