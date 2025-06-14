@@ -6,9 +6,9 @@ import { useToast } from '@/hooks/use-toast';
 
 interface Profile {
   id: string;
-  email: string;
-  full_name: string;
-  avatar_url: string;
+  email: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
   user_type: 'artist' | 'client';
   created_at: string;
   updated_at: string;
@@ -47,6 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, session);
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -59,6 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               .eq('id', session.user.id)
               .single();
             
+            console.log('Profile data:', profileData);
             setProfile(profileData);
           }, 0);
         } else {
@@ -71,6 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session:', session);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
