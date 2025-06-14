@@ -1,275 +1,223 @@
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Palette, Eye, EyeOff } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useForm } from "react-hook-form";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
 
-interface SignUpForm {
-  email: string;
-  password: string;
-  confirmPassword: string;
-  userType: 'client' | 'artist';
-}
+type AuthMode = "sign-in" | "sign-up";
 
-interface SignInForm {
-  email: string;
-  password: string;
-}
+const Auth: React.FC = () => {
+  const { signIn, signUp } = useAuth();
+  const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-const Auth = () => {
-  const [activeTab, setActiveTab] = useState("signin");
-  const [showPassword, setShowPassword] = useState(false);
+  // fields for sign up
+  const [userType, setUserType] = useState<"artist" | "client" | "">("");
+  const [fullName, setFullName] = useState("");
+  const [artType, setArtType] = useState(""); // For artists
+  const [district, setDistrict] = useState(""); // For artists
+
+  // UI/UX
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const { signUp, signIn, signInWithGoogle, user } = useAuth();
+
   const navigate = useNavigate();
 
-  const signUpForm = useForm<SignUpForm>({
-    defaultValues: {
-      userType: 'client'
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (authMode === "sign-in") {
+      setLoading(true);
+      const { error } = await signIn(email, password);
+      setLoading(false);
+
+      if (!error) {
+        navigate("/");
+      } else {
+        setError(error.message || "Could not sign in");
+      }
+    } else {
+      // Sign Up Validation
+      if (!userType) {
+        setError("Please select Artist or Customer.");
+        return;
+      }
+      if (!email || !password) {
+        setError("Email and password are required.");
+        return;
+      }
+      if (!fullName.trim()) {
+        setError("Name is required.");
+        return;
+      }
+      if (userType === "artist" && (!artType.trim() || !district.trim())) {
+        setError("Please provide your Art Type and District.");
+        return;
+      }
+
+      setLoading(true);
+
+      // 1. Register user in Supabase Auth
+      const { error } = await signUp(email, password, userType);
+      if (error) {
+        setLoading(false);
+        setError(error.message || "Could not sign up");
+        return;
+      }
+
+      // 2. After signup, update profile with extra info (and create artist_profile)
+      // Supabase Auth will trigger the row insert for `profiles` automatically.
+      // But we need to update with full_name, user_type, etc.
+
+      // Wait for user to exist (small delay for Supabase signup process)
+      setTimeout(async () => {
+        const { data: user } = await supabase.auth.getUser();
+        if (!user?.user) return;
+
+        const user_id = user.user.id;
+
+        // Update profiles with full name and user_type
+        await supabase
+          .from("profiles")
+          .update({ full_name: fullName, user_type: userType })
+          .eq("id", user_id);
+
+        // If artist, also ensure artist_profiles row exists
+        if (userType === "artist") {
+          await supabase
+            .from("artist_profiles")
+            .upsert(
+              {
+                id: user_id,
+                specialty: artType,
+                location: district,
+                bio: "",
+                phone: "",
+                portfolio_images: [],
+              },
+              { onConflict: "id" }
+            );
+        }
+
+        setLoading(false);
+        navigate("/");
+      }, 1200);
+
+      // Show a toast or message: "Check your email to confirm registration." (handled in AuthContext)
     }
-  });
-
-  const signInForm = useForm<SignInForm>();
-
-  useEffect(() => {
-    if (user) {
-      navigate('/');
-    }
-  }, [user, navigate]);
-
-  const handleSignUp = async (data: SignUpForm) => {
-    if (data.password !== data.confirmPassword) {
-      signUpForm.setError('confirmPassword', {
-        type: 'manual',
-        message: 'Passwords do not match'
-      });
-      return;
-    }
-
-    setLoading(true);
-    await signUp(data.email, data.password, data.userType);
-    setLoading(false);
-  };
-
-  const handleSignIn = async (data: SignInForm) => {
-    setLoading(true);
-    const { error } = await signIn(data.email, data.password);
-    if (!error) {
-      navigate('/');
-    }
-    setLoading(false);
-  };
-
-  const handleGoogleSignIn = async () => {
-    setLoading(true);
-    await signInWithGoogle();
-    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-purple-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center text-gray-600 hover:text-gray-800 mb-4">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </Link>
-          <div className="flex items-center justify-center space-x-2 mb-4">
-            <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-pink-500 rounded-full flex items-center justify-center">
-              <span className="text-white font-bold">AC</span>
-            </div>
-            <span className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">
-              ArtConnect
-            </span>
-          </div>
-          <p className="text-gray-600">Join the creative community</p>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-pink-50 to-purple-50">
+      <Card className="max-w-md w-full p-8 mx-2">
+        <div className="mb-6 flex gap-2">
+          <Button 
+            variant={authMode === "sign-in" ? "default" : "outline"}
+            className="w-1/2"
+            onClick={() => setAuthMode("sign-in")}
+          >Sign In</Button>
+          <Button
+            variant={authMode === "sign-up" ? "default" : "outline"}
+            className="w-1/2"
+            onClick={() => setAuthMode("sign-up")}
+          >Sign Up</Button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-center">Welcome to ArtConnect</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="signin">Sign In</TabsTrigger>
-                <TabsTrigger value="signup">Sign Up</TabsTrigger>
-              </TabsList>
+        <form className="flex flex-col gap-4" onSubmit={handleAuth}>
+          <Input
+            type="email"
+            placeholder="Email"
+            value={email}
+            disabled={loading}
+            onChange={e => setEmail(e.target.value)}
+            required
+          />
+          <Input
+            type="password"
+            placeholder="Password"
+            value={password}
+            disabled={loading}
+            onChange={e => setPassword(e.target.value)}
+            required
+          />
 
-              <TabsContent value="signin" className="space-y-4">
-                <form onSubmit={signInForm.handleSubmit(handleSignIn)} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signin-email">Email</Label>
-                    <Input
-                      id="signin-email"
-                      type="email"
-                      placeholder="your@email.com"
-                      {...signInForm.register('email', { required: 'Email is required' })}
-                    />
-                    {signInForm.formState.errors.email && (
-                      <p className="text-sm text-red-500">{signInForm.formState.errors.email.message}</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signin-password">Password</Label>
-                    <div className="relative">
-                      <Input
-                        id="signin-password"
-                        type={showPassword ? "text" : "password"}
-                        {...signInForm.register('password', { required: 'Password is required' })}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                    {signInForm.formState.errors.password && (
-                      <p className="text-sm text-red-500">{signInForm.formState.errors.password.message}</p>
-                    )}
-                  </div>
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-gradient-to-r from-orange-500 to-pink-500"
-                    disabled={loading}
-                  >
-                    {loading ? "Signing in..." : "Sign In"}
-                  </Button>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="signup" className="space-y-4">
-                <form onSubmit={signUpForm.handleSubmit(handleSignUp)} className="space-y-4">
-                  {/* User Type Selection */}
-                  <div className="space-y-3">
-                    <Label>I am a:</Label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Button
-                        type="button"
-                        variant={signUpForm.watch('userType') === "client" ? "default" : "outline"}
-                        onClick={() => signUpForm.setValue('userType', 'client')}
-                        className={signUpForm.watch('userType') === "client" ? "bg-gradient-to-r from-orange-500 to-pink-500" : ""}
-                      >
-                        Art Lover
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={signUpForm.watch('userType') === "artist" ? "default" : "outline"}
-                        onClick={() => signUpForm.setValue('userType', 'artist')}
-                        className={signUpForm.watch('userType') === "artist" ? "bg-gradient-to-r from-orange-500 to-pink-500" : ""}
-                      >
-                        <Palette className="w-4 h-4 mr-2" />
-                        Artist
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      placeholder="your@email.com"
-                      {...signUpForm.register('email', { required: 'Email is required' })}
-                    />
-                    {signUpForm.formState.errors.email && (
-                      <p className="text-sm text-red-500">{signUpForm.formState.errors.email.message}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
-                    <div className="relative">
-                      <Input
-                        id="signup-password"
-                        type={showPassword ? "text" : "password"}
-                        {...signUpForm.register('password', { 
-                          required: 'Password is required',
-                          minLength: { value: 6, message: 'Password must be at least 6 characters' }
-                        })}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                    {signUpForm.formState.errors.password && (
-                      <p className="text-sm text-red-500">{signUpForm.formState.errors.password.message}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="confirm-password">Confirm Password</Label>
-                    <Input
-                      id="confirm-password"
-                      type="password"
-                      {...signUpForm.register('confirmPassword', { required: 'Please confirm your password' })}
-                    />
-                    {signUpForm.formState.errors.confirmPassword && (
-                      <p className="text-sm text-red-500">{signUpForm.formState.errors.confirmPassword.message}</p>
-                    )}
-                  </div>
-
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-gradient-to-r from-orange-500 to-pink-500"
-                    disabled={loading}
-                  >
-                    {loading ? "Creating account..." : "Create Account"}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
-
-            {/* Google Sign-in */}
-            <div className="space-y-4">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-gray-500">or continue with</span>
-                </div>
+          {authMode === "sign-up" && (
+            <>
+              {/* Choose user type */}
+              <label className="block font-medium text-gray-700">
+                I am a:
+              </label>
+              <div className="flex gap-4 mb-2">
+                <Button
+                  type="button"
+                  variant={userType === "client" ? "default" : "outline"}
+                  onClick={() => setUserType("client")}
+                  className="flex-1"
+                  disabled={loading}
+                >
+                  Customer
+                </Button>
+                <Button
+                  type="button"
+                  variant={userType === "artist" ? "default" : "outline"}
+                  onClick={() => setUserType("artist")}
+                  className="flex-1"
+                  disabled={loading}
+                >
+                  Artist
+                </Button>
               </div>
-              
-              <Button 
-                onClick={handleGoogleSignIn}
-                variant="outline" 
-                className="w-full"
-                disabled={loading}
-              >
-                <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                  <path fill="#4285f4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34a853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="#fbbc05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                  <path fill="#ea4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                </svg>
-                Continue with Google
-              </Button>
-            </div>
 
-            <p className="text-xs text-center text-gray-500">
-              By continuing, you agree to our Terms of Service and Privacy Policy
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+              {/* Name is always required */}
+              <Input
+                placeholder="Full Name"
+                value={fullName}
+                onChange={e => setFullName(e.target.value)}
+                disabled={loading}
+              />
+
+              {/* Show these only for artist */}
+              {userType === "artist" && (
+                <>
+                  <Input
+                    placeholder="Art Type (e.g. Painter, Sculptor)"
+                    value={artType}
+                    onChange={e => setArtType(e.target.value)}
+                    disabled={loading}
+                  />
+                  <Input
+                    placeholder="District"
+                    value={district}
+                    onChange={e => setDistrict(e.target.value)}
+                    disabled={loading}
+                  />
+                </>
+              )}
+            </>
+          )}
+
+          {error && (
+            <div className="bg-red-100 text-red-700 p-2 rounded text-sm">{error}</div>
+          )}
+
+          <Button type="submit" loading={loading} className="mt-2 w-full">
+            {authMode === "sign-in" ? "Sign In" : "Sign Up"}
+          </Button>
+        </form>
+        <div className="mt-4">
+          <Badge>
+            {authMode === "sign-in"
+              ? "Don’t have an account? Sign up above."
+              : "Already have an account? Click Sign In above."}
+          </Badge>
+        </div>
+      </Card>
     </div>
   );
 };

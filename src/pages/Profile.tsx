@@ -1,4 +1,3 @@
-
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,7 +13,7 @@ interface ArtistProfileData {
   location: string | null;
   phone: string | null;
   portfolio_images: string[] | null;
-  portfolio_videos: string[] | null; // Allow null
+  portfolio_videos: string[] | null;
 }
 
 const Profile = () => {
@@ -41,13 +40,20 @@ const Profile = () => {
         .maybeSingle()
         .then(({ data }) => {
           if (data) {
-            setArtistProfile(data);
+            setArtistProfile({
+              bio: data.bio || "",
+              specialty: data.specialty || "",
+              location: data.location || "",
+              phone: data.phone || "",
+              portfolio_images: data.portfolio_images || [],
+              portfolio_videos: data.portfolio_videos ?? [],
+            });
             setBio(data.bio || "");
             setSpecialty(data.specialty || "");
             setLocation(data.location || "");
             setPhone(data.phone || "");
             setPortfolioImages(data.portfolio_images || []);
-            setPortfolioVideos(data.portfolio_videos || []); // Accept null, set as []
+            setPortfolioVideos(data.portfolio_videos ?? []);
           }
         });
     }
