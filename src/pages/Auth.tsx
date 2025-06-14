@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -108,22 +109,6 @@ const Auth: React.FC = () => {
     }
   };
 
-  const handleGoogleSignUp = async () => {
-    setLoading(true);
-    
-    // Store the user type selection in localStorage so we can use it after redirect
-    if (authMode === "sign-up" && userType) {
-      localStorage.setItem('pendingUserType', userType);
-    }
-    
-    const { error } = await signInWithGoogle();
-    if (error) {
-      setLoading(false);
-      setError(error.message || "Google sign in failed");
-    }
-    // Note: Loading state will be cleared by auth state change
-  };
-
   // Helper for section titles
   const SectionTitle = ({ title }: { title: string }) => (
     <h2 className="text-2xl font-bold text-center text-gray-900 mb-4 mt-2">{title}</h2>
@@ -175,38 +160,14 @@ const Auth: React.FC = () => {
           variant="outline" 
           className="w-full mb-4 flex items-center justify-center border-2 border-gray-200 rounded-full shadow-sm transition-all hover:shadow-lg font-medium"
           type="button"
-          disabled={loading || (authMode === "sign-up" && !userType)}
-          onClick={handleGoogleSignUp}>
+          disabled={loading}
+          onClick={() => {
+            setLoading(true);
+            signInWithGoogle().finally(() => setLoading(false));
+          }}>
           <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google Icon" className="h-5 w-5 mr-2" />
           {authMode === "sign-in" ? "Sign in with Google" : "Sign up with Google"}
         </Button>
-
-        {/* Show user type selection for sign up mode before Google button becomes active */}
-        {authMode === "sign-up" && !userType && (
-          <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-            <p className="text-sm text-blue-700 mb-2">Please select your account type first:</p>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setUserType("client")}
-                className="flex-1"
-              >
-                Customer
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setUserType("artist")}
-                className="flex-1"
-              >
-                Artist
-              </Button>
-            </div>
-          </div>
-        )}
 
         {/* Email Form */}
         <form className="flex flex-col gap-4" onSubmit={handleAuth}>

@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -42,142 +42,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  
-  const processedUsers = useRef(new Set<string>());
-
-  const handleAuthStateChange = async (event: string, session: Session | null) => {
-    console.log('Auth state changed:', event, session);
-    
-    // Always update session and user first
-    setSession(session);
-    setUser(session?.user ?? null);
-
-    // If no session, clear everything and stop loading
-    if (!session?.user) {
-      setProfile(null);
-      processedUsers.current.clear();
-      setLoading(false);
-      return;
-    }
-
-    const userId = session.user.id;
-
-    // If we already processed this user, just clear loading
-    if (processedUsers.current.has(userId)) {
-      console.log('User already processed, clearing loading');
-      setLoading(false);
-      return;
-    }
-
-    // Mark user as being processed
-    processedUsers.current.add(userId);
-
-    try {
-      // Fetch user profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (profileError) {
-        console.error('Error fetching profile:', profileError);
-        setProfile(null);
-        setLoading(false);
-        return;
-      }
-
-      console.log('Fetched profile data:', profileData);
-
-      if (profileData) {
-        setProfile({
-          ...profileData,
-          user_type: profileData.user_type as 'artist' | 'client'
-        });
-
-        // Handle Google OAuth redirects
-        const pendingUserType = localStorage.getItem('pendingUserType');
-        if (pendingUserType) {
-          localStorage.removeItem('pendingUserType');
-
-          if (pendingUserType === 'artist') {
-            await supabase
-              .from('profiles')
-              .update({ user_type: 'artist' })
-              .eq('id', userId);
-
-            await supabase
-              .from('artist_profiles')
-              .upsert(
-                {
-                  id: userId,
-                  specialty: '',
-                  location: '',
-                  phone: '',
-                  bio: '',
-                  portfolio_images: [],
-                },
-                { onConflict: 'id' }
-              );
-
-            window.location.href = '/complete-profile';
-            return;
-          } else if (pendingUserType === 'client') {
-            await supabase
-              .from('profiles')
-              .update({ user_type: 'client' })
-              .eq('id', userId);
-
-            window.location.href = '/';
-            return;
-          }
-        }
-
-        // Check if artist has incomplete profile
-        if (profileData.user_type === 'artist') {
-          const { data: artistProfile } = await supabase
-            .from('artist_profiles')
-            .select('specialty, location, phone')
-            .eq('id', userId)
-            .maybeSingle();
-          
-          console.log('Artist profile:', artistProfile);
-          
-          if (!artistProfile || !artistProfile.specialty || !artistProfile.location || !artistProfile.phone) {
-            if (window.location.pathname !== '/complete-profile') {
-              window.location.href = '/complete-profile';
-              return;
-            }
-          }
-        }
-
-        // Redirect from auth page to home if user is fully set up
-        if (window.location.pathname === '/auth') {
-          window.location.href = '/';
-          return;
-        }
-      }
-    } catch (error) {
-      console.error('Error in auth state change:', error);
-      setProfile(null);
-    }
-
-    // Always clear loading at the end
-    setLoading(false);
-  };
 
   useEffect(() => {
     // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange);
-
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session:', session);
-      if (session) {
-        handleAuthStateChange('INITIAL', session);
-      } else {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, session);
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          // Fetch user profile
+          setTimeout(async () => {
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+            
+            console.log('Profile data:', profileData);
+            if (profileData) {
+              setProfile({
+                ...profileData,
+                user_type: profileData.user_type as 'artist' | 'client'
+              });
+            }
+          }, 0);
+        } else {
+          setProfile(null);
+        }
+        
         setLoading(false);
       }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session:', session);
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -231,7 +135,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithGoogle = async () => {
-    const redirectUrl = `${window.location.origin}/`;
+    const redirectUrl = `${window.location.origin}/auth`;
     
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -256,7 +160,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setSession(null);
     setProfile(null);
-    processedUsers.current.clear();
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
