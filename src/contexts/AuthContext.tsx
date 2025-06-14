@@ -61,7 +61,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               .single();
             
             console.log('Profile data:', profileData);
-            setProfile(profileData);
+            if (profileData) {
+              setProfile({
+                ...profileData,
+                user_type: profileData.user_type as 'artist' | 'client'
+              });
+            }
           }, 0);
         } else {
           setProfile(null);
@@ -179,7 +184,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('id', user.id)
         .single();
       
-      setProfile(updatedProfile);
+      if (updatedProfile) {
+        setProfile({
+          ...updatedProfile,
+          user_type: updatedProfile.user_type as 'artist' | 'client'
+        });
+      }
       
       toast({
         title: "Profile updated",
