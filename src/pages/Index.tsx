@@ -1,10 +1,9 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Star, MapPin, Calendar, Heart, User, Search } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Link } from "react-router-dom";
 
 const Index = () => {
   const [activeService, setActiveService] = useState("all");
@@ -101,13 +100,17 @@ const Index = () => {
             </span>
           </div>
           <div className="flex items-center space-x-4">
-            <Button variant="outline" className="hidden md:flex">
-              <User className="w-4 h-4 mr-2" />
-              Sign In
-            </Button>
-            <Button className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600">
-              Join as Artist
-            </Button>
+            <Link to="/auth">
+              <Button variant="outline" className="hidden md:flex">
+                <User className="w-4 h-4 mr-2" />
+                Sign In
+              </Button>
+            </Link>
+            <Link to="/auth">
+              <Button className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600">
+                Join as Artist
+              </Button>
+            </Link>
           </div>
         </div>
       </header>
@@ -125,13 +128,17 @@ const Index = () => {
             Book appointments, explore portfolios, and celebrate creativity.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button size="lg" className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 px-8 py-3 text-lg">
-              Explore Artists
-            </Button>
-            <Button size="lg" variant="outline" className="px-8 py-3 text-lg border-orange-300 text-orange-600">
-              <Search className="w-5 h-5 mr-2" />
-              Find Services
-            </Button>
+            <Link to="/search">
+              <Button size="lg" className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 px-8 py-3 text-lg">
+                Explore Artists
+              </Button>
+            </Link>
+            <Link to="/search">
+              <Button size="lg" variant="outline" className="px-8 py-3 text-lg border-orange-300 text-orange-600">
+                <Search className="w-5 h-5 mr-2" />
+                Find Services
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
@@ -210,7 +217,11 @@ const Index = () => {
                 </div>
                 
                 <CardContent className="p-4">
-                  <h3 className="font-semibold text-lg mb-2">{artist.name}</h3>
+                  <Link to={`/artist/${artist.id}`}>
+                    <h3 className="font-semibold text-lg mb-2 hover:text-orange-600 transition-colors">
+                      {artist.name}
+                    </h3>
+                  </Link>
                   <div className="flex items-center text-gray-600 text-sm mb-2">
                     <MapPin className="w-4 h-4 mr-1" />
                     {artist.location}
@@ -239,10 +250,12 @@ const Index = () => {
                     <span className="text-lg font-semibold text-orange-600">
                       From {artist.startingPrice}
                     </span>
-                    <Button size="sm" className="bg-gradient-to-r from-orange-500 to-pink-500">
-                      <Calendar className="w-4 h-4 mr-1" />
-                      Book
-                    </Button>
+                    <Link to={`/booking/${artist.id}`}>
+                      <Button size="sm" className="bg-gradient-to-r from-orange-500 to-pink-500">
+                        <Calendar className="w-4 h-4 mr-1" />
+                        Book
+                      </Button>
+                    </Link>
                   </div>
                 </CardContent>
               </Card>
@@ -261,9 +274,11 @@ const Index = () => {
             <p className="text-xl mb-8 opacity-90">
               Join thousands of artists who are building their careers on ArtConnect
             </p>
-            <Button size="lg" className="bg-white text-orange-600 hover:bg-gray-100 px-8 py-3 text-lg">
-              Start Your Journey
-            </Button>
+            <Link to="/auth">
+              <Button size="lg" className="bg-white text-orange-600 hover:bg-gray-100 px-8 py-3 text-lg">
+                Start Your Journey
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
@@ -282,7 +297,7 @@ const Index = () => {
           </p>
           <div className="flex justify-center space-x-8 text-sm">
             <a href="#" className="hover:text-orange-400 transition-colors">About</a>
-            <a href="#" className="hover:text-orange-400 transition-colors">Artists</a>
+            <Link to="/search" className="hover:text-orange-400 transition-colors">Artists</Link>
             <a href="#" className="hover:text-orange-400 transition-colors">Services</a>
             <a href="#" className="hover:text-orange-400 transition-colors">Support</a>
           </div>
