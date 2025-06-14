@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -41,10 +41,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  
+  // Use ref to track if we've already handled redirects for this session
+  const hasRedirectedRef = useRef(false);
 
   useEffect(() => {
-    let redirectHandled = false;
-
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -52,7 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(session);
         setUser(session?.user ?? null);
         
-        if (session?.user && !redirectHandled) {
+        if (session?.user) {
           // Fetch user profile
           setTimeout(async () => {
             const { data: profileData } = await supabase
@@ -69,11 +70,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 user_type: profileData.user_type as 'artist' | 'client'
               });
 
-              // Handle Google OAuth redirect for new users
+              // Handle Google OAuth redirect for new users - only once per session
               const pendingUserType = localStorage.getItem('pendingUserType');
               
-              if (event === 'SIGNED_IN' && pendingUserType) {
-                redirectHandled = true;
+              if (event === 'SIGNED_IN' && pendingUserType && !hasRedirectedRef.current) {
+                hasRedirectedRef.current = true;
                 
                 if (pendingUserType === 'artist') {
                   // Update profile with artist user type if not set
@@ -121,8 +122,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
               }
 
-              // Check if this is an artist who needs to complete profile (only for existing users)
-              if (profileData.user_type === 'artist' && !pendingUserType && !redirectHandled) {
+              // Check if this is an artist who needs to complete profile (existing users only)
+              if (profileData.user_type === 'artist' && !pendingUserType && !hasRedirectedRef.current) {
                 const { data: artistProfile } = await supabase
                   .from('artist_profiles')
                   .select('specialty, location, phone')
@@ -135,7 +136,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 if (!artistProfile || !artistProfile.specialty || !artistProfile.location || !artistProfile.phone) {
                   if (window.location.pathname !== '/complete-profile') {
                     console.log('Redirecting to complete profile');
-                    redirectHandled = true;
+                    hasRedirectedRef.current = true;
                     setTimeout(() => {
                       window.location.href = '/complete-profile';
                     }, 500);
@@ -145,8 +146,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
 
               // If we're on auth page and user is fully set up, redirect to home (only once)
-              if (window.location.pathname === '/auth' && !redirectHandled && !pendingUserType) {
-                redirectHandled = true;
+              if (window.location.pathname === '/auth' && !hasRedirectedRef.current && !pendingUserType) {
+                hasRedirectedRef.current = true;
                 setTimeout(() => {
                   window.location.href = '/';
                 }, 500);
@@ -158,7 +159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }, 0);
         } else if (!session?.user) {
           setProfile(null);
-          redirectHandled = false; // Reset redirect flag when user logs out
+          hasRedirectedRef.current = false; // Reset redirect flag when user logs out
         }
         
         setLoading(false);
@@ -249,6 +250,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setSession(null);
     setProfile(null);
+    hasRedirectedRef.current = false; // Reset redirect flag on sign out
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
