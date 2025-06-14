@@ -45,7 +45,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const processedUsers = useRef(new Set<string>());
 
   useEffect(() => {
-    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session);
@@ -56,11 +55,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           processedUsers.current.add(session.user.id);
 
           // Fetch user profile
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+          let profileFetchError = null;
+          let profileData = null;
+          try {
+            const { data, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+            profileData = data;
+            profileFetchError = error;
+          } catch (e) {
+            profileFetchError = e;
+          }
+
+          if (profileFetchError) {
+            console.error('Error fetching profile:', profileFetchError);
+            setProfile(null);
+            setLoading(false);
+            return;
+          }
 
           console.log('Fetched profile data:', profileData);
 
@@ -142,13 +156,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else if (!session?.user) {
           setProfile(null);
           processedUsers.current.clear();
+          setLoading(false);
+          return;
+        } else {
+          // Some unexpected case - always clear loading
+          setLoading(false);
         }
-
-        setLoading(false); // Ensure loading is set to false in ALL code paths
       }
     );
 
-    // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('Initial session:', session);
       setSession(session);
