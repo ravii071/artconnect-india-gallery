@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -68,63 +67,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 user_type: profileData.user_type as 'artist' | 'client'
               });
 
-              // Handle new user setup for Google OAuth
-              if (event === 'SIGNED_IN' && !profileData.user_type) {
-                // Check if there's a pending user type from localStorage (for Google signup)
-                const pendingUserType = localStorage.getItem('pendingUserType');
-                
-                if (pendingUserType) {
-                  // Update profile with the pending user type
+              // Handle Google OAuth redirect for artists
+              const pendingUserType = localStorage.getItem('pendingUserType');
+              
+              if (event === 'SIGNED_IN' && pendingUserType === 'artist') {
+                // Update profile with artist user type if not set
+                if (!profileData.user_type || profileData.user_type !== 'artist') {
                   await supabase
                     .from('profiles')
-                    .update({ user_type: pendingUserType })
+                    .update({ user_type: 'artist' })
                     .eq('id', session.user.id);
-                  
-                  // If artist, create artist profile and redirect to complete profile
-                  if (pendingUserType === 'artist') {
-                    await supabase
-                      .from('artist_profiles')
-                      .upsert(
-                        {
-                          id: session.user.id,
-                          specialty: '',
-                          location: '',
-                          phone: '',
-                          bio: '',
-                          portfolio_images: [],
-                        },
-                        { onConflict: 'id' }
-                      );
-                    
-                    localStorage.removeItem('pendingUserType');
-                    setTimeout(() => {
-                      window.location.href = '/complete-profile';
-                    }, 1000);
-                    return;
-                  } else {
-                    localStorage.removeItem('pendingUserType');
-                    setTimeout(() => {
-                      window.location.href = '/';
-                    }, 1000);
-                    return;
-                  }
                 }
+                
+                // Create empty artist profile
+                await supabase
+                  .from('artist_profiles')
+                  .upsert(
+                    {
+                      id: session.user.id,
+                      specialty: '',
+                      location: '',
+                      phone: '',
+                      bio: '',
+                      portfolio_images: [],
+                    },
+                    { onConflict: 'id' }
+                  );
+                
+                localStorage.removeItem('pendingUserType');
+                setTimeout(() => {
+                  window.location.href = '/complete-profile';
+                }, 500);
+                return;
+              } else if (event === 'SIGNED_IN' && pendingUserType === 'client') {
+                // Update profile with client user type if not set
+                if (!profileData.user_type || profileData.user_type !== 'client') {
+                  await supabase
+                    .from('profiles')
+                    .update({ user_type: 'client' })
+                    .eq('id', session.user.id);
+                }
+                
+                localStorage.removeItem('pendingUserType');
+                setTimeout(() => {
+                  window.location.href = '/';
+                }, 500);
+                return;
               }
 
               // Check if this is an artist who needs to complete profile
-              if (profileData.user_type === 'artist' && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+              if (profileData.user_type === 'artist') {
                 const { data: artistProfile } = await supabase
                   .from('artist_profiles')
                   .select('specialty, location, phone')
                   .eq('id', session.user.id)
                   .maybeSingle();
 
+                console.log('Artist profile data:', artistProfile);
+
                 // If artist profile doesn't exist or is incomplete, redirect to complete profile
                 if (!artistProfile || !artistProfile.specialty || !artistProfile.location || !artistProfile.phone) {
                   if (window.location.pathname !== '/complete-profile') {
+                    console.log('Redirecting to complete profile');
                     setTimeout(() => {
                       window.location.href = '/complete-profile';
-                    }, 1000);
+                    }, 500);
                   }
                   return;
                 }
@@ -134,19 +141,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               if (window.location.pathname === '/auth') {
                 setTimeout(() => {
                   window.location.href = '/';
-                }, 1000);
+                }, 500);
               }
             } else if (session?.user && event === 'SIGNED_IN') {
-              // No profile exists, this is likely a new Google user
-              // Check for pending user type
-              const pendingUserType = localStorage.getItem('pendingUserType');
-              
-              if (!pendingUserType) {
-                // If no pending user type, redirect to auth to select
-                setTimeout(() => {
-                  window.location.href = '/auth';
-                }, 1000);
-              }
+              // No profile exists - this shouldn't happen with the trigger but handle it
+              console.log('No profile found for user, this is unexpected');
             }
           }, 0);
         } else {
