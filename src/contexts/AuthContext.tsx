@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -52,19 +51,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('Auth state changed:', event, session);
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         if (session?.user && !processedUsers.current.has(session.user.id)) {
           processedUsers.current.add(session.user.id);
-          
+
           // Fetch user profile
           const { data: profileData } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', session.user.id)
             .single();
-          
-          console.log('Profile data:', profileData);
-          
+
+          console.log('Fetched profile data:', profileData);
+
           if (profileData) {
             setProfile({
               ...profileData,
@@ -73,18 +72,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             // Handle Google OAuth redirects
             const pendingUserType = localStorage.getItem('pendingUserType');
-            
+
             if (pendingUserType) {
               localStorage.removeItem('pendingUserType');
-              
+
               if (pendingUserType === 'artist') {
-                // Update profile to artist type
                 await supabase
                   .from('profiles')
                   .update({ user_type: 'artist' })
                   .eq('id', session.user.id);
-                
-                // Create artist profile
+
                 await supabase
                   .from('artist_profiles')
                   .upsert(
@@ -98,33 +95,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     },
                     { onConflict: 'id' }
                   );
-                
+
                 window.location.href = '/complete-profile';
+                setLoading(false);
                 return;
               } else if (pendingUserType === 'client') {
-                // Update profile to client type
                 await supabase
                   .from('profiles')
                   .update({ user_type: 'client' })
                   .eq('id', session.user.id);
-                
+
                 window.location.href = '/';
+                setLoading(false);
                 return;
               }
             }
 
-            // Check if artist needs to complete profile (only for existing artists)
+            // Check if artist has incomplete profile (and redirect if necessary)
             if (profileData.user_type === 'artist') {
               const { data: artistProfile } = await supabase
                 .from('artist_profiles')
                 .select('specialty, location, phone')
                 .eq('id', session.user.id)
                 .maybeSingle();
-
-              // If artist profile is incomplete, redirect to complete profile
+              console.log('Artist profile:', artistProfile);
               if (!artistProfile || !artistProfile.specialty || !artistProfile.location || !artistProfile.phone) {
                 if (window.location.pathname !== '/complete-profile') {
                   window.location.href = '/complete-profile';
+                  setLoading(false);
                   return;
                 }
               }
@@ -133,14 +131,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Redirect from auth page to home if user is fully set up
             if (window.location.pathname === '/auth') {
               window.location.href = '/';
+              setLoading(false);
+              return;
             }
+          } else {
+            // No profileData: set loading to false
+            setLoading(false);
+            return;
           }
         } else if (!session?.user) {
           setProfile(null);
           processedUsers.current.clear();
         }
-        
-        setLoading(false);
+
+        setLoading(false); // Ensure loading is set to false in ALL code paths
       }
     );
 
