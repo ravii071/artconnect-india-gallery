@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,7 +43,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   
-  // Use ref to track if we've already handled redirects for this session
   const hasRedirectedRef = useRef(false);
 
   useEffect(() => {
@@ -70,22 +70,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 user_type: profileData.user_type as 'artist' | 'client'
               });
 
-              // Handle Google OAuth redirect for new users - only once per session
+              // Simple Google OAuth redirect logic
               const pendingUserType = localStorage.getItem('pendingUserType');
               
-              if (event === 'SIGNED_IN' && pendingUserType && !hasRedirectedRef.current) {
+              if (pendingUserType && !hasRedirectedRef.current) {
                 hasRedirectedRef.current = true;
                 
                 if (pendingUserType === 'artist') {
-                  // Update profile with artist user type if not set
-                  if (!profileData.user_type || profileData.user_type !== 'artist') {
-                    await supabase
-                      .from('profiles')
-                      .update({ user_type: 'artist' })
-                      .eq('id', session.user.id);
-                  }
+                  // Update profile to artist type
+                  await supabase
+                    .from('profiles')
+                    .update({ user_type: 'artist' })
+                    .eq('id', session.user.id);
                   
-                  // Create empty artist profile
+                  // Create artist profile
                   await supabase
                     .from('artist_profiles')
                     .upsert(
@@ -101,65 +99,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     );
                   
                   localStorage.removeItem('pendingUserType');
-                  setTimeout(() => {
-                    window.location.href = '/complete-profile';
-                  }, 500);
+                  window.location.href = '/complete-profile';
                   return;
                 } else if (pendingUserType === 'client') {
-                  // Update profile with client user type if not set
-                  if (!profileData.user_type || profileData.user_type !== 'client') {
-                    await supabase
-                      .from('profiles')
-                      .update({ user_type: 'client' })
-                      .eq('id', session.user.id);
-                  }
+                  // Update profile to client type
+                  await supabase
+                    .from('profiles')
+                    .update({ user_type: 'client' })
+                    .eq('id', session.user.id);
                   
                   localStorage.removeItem('pendingUserType');
-                  setTimeout(() => {
-                    window.location.href = '/';
-                  }, 500);
+                  window.location.href = '/';
                   return;
                 }
               }
 
-              // Check if this is an artist who needs to complete profile (existing users only)
-              if (profileData.user_type === 'artist' && !pendingUserType && !hasRedirectedRef.current) {
+              // Check if artist needs to complete profile
+              if (profileData.user_type === 'artist' && !hasRedirectedRef.current) {
                 const { data: artistProfile } = await supabase
                   .from('artist_profiles')
                   .select('specialty, location, phone')
                   .eq('id', session.user.id)
                   .maybeSingle();
 
-                console.log('Artist profile data:', artistProfile);
-
-                // If artist profile doesn't exist or is incomplete, redirect to complete profile
+                // If artist profile is incomplete, redirect to complete profile
                 if (!artistProfile || !artistProfile.specialty || !artistProfile.location || !artistProfile.phone) {
                   if (window.location.pathname !== '/complete-profile') {
-                    console.log('Redirecting to complete profile');
                     hasRedirectedRef.current = true;
-                    setTimeout(() => {
-                      window.location.href = '/complete-profile';
-                    }, 500);
+                    window.location.href = '/complete-profile';
                     return;
                   }
                 }
               }
 
-              // If we're on auth page and user is fully set up, redirect to home (only once)
-              if (window.location.pathname === '/auth' && !hasRedirectedRef.current && !pendingUserType) {
+              // Redirect from auth page to home if user is fully set up
+              if (window.location.pathname === '/auth' && !hasRedirectedRef.current) {
                 hasRedirectedRef.current = true;
-                setTimeout(() => {
-                  window.location.href = '/';
-                }, 500);
+                window.location.href = '/';
               }
-            } else if (session?.user && event === 'SIGNED_IN') {
-              // No profile exists - this shouldn't happen with the trigger but handle it
-              console.log('No profile found for user, this is unexpected');
             }
           }, 0);
-        } else if (!session?.user) {
+        } else {
           setProfile(null);
-          hasRedirectedRef.current = false; // Reset redirect flag when user logs out
+          hasRedirectedRef.current = false;
         }
         
         setLoading(false);
@@ -250,7 +232,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setSession(null);
     setProfile(null);
-    hasRedirectedRef.current = false; // Reset redirect flag on sign out
+    hasRedirectedRef.current = false;
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
