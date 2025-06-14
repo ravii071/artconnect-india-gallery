@@ -122,7 +122,7 @@ const Auth: React.FC = () => {
             onClick={() => setAuthMode("sign-up")}
           >Sign Up</Button>
         </div>
-        {/* Google Sign In */}
+        {/* Google Sign In or Sign Up */}
         {authMode === "sign-in" && (
           <Button 
             variant="outline" 
@@ -134,6 +134,21 @@ const Auth: React.FC = () => {
             }}>
             <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google Icon" className="h-5 w-5 mr-2" />
             Sign in with Google
+          </Button>
+        )}
+        {/* Show Google signup when in sign-up mode */}
+        {authMode === "sign-up" && (
+          <Button
+            variant="outline"
+            className="w-full mb-4 flex items-center justify-center"
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              signInWithGoogle().finally(() => setLoading(false));
+            }}
+          >
+            <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google Icon" className="h-5 w-5 mr-2" />
+            Sign up with Google
           </Button>
         )}
 
