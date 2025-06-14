@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -206,8 +205,10 @@ const Auth: React.FC = () => {
             <div className="bg-red-100 text-red-700 p-2 rounded text-sm">{error}</div>
           )}
 
-          <Button type="submit" loading={loading} className="mt-2 w-full">
-            {authMode === "sign-in" ? "Sign In" : "Sign Up"}
+          <Button type="submit" className="mt-2 w-full">
+            {loading
+              ? (authMode === "sign-in" ? "Signing In..." : "Signing Up...")
+              : (authMode === "sign-in" ? "Sign In" : "Sign Up")}
           </Button>
         </form>
         <div className="mt-4">

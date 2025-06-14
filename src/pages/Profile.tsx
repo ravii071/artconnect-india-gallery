@@ -13,7 +13,6 @@ interface ArtistProfileData {
   location: string | null;
   phone: string | null;
   portfolio_images: string[] | null;
-  portfolio_videos: string[] | null;
 }
 
 const Profile = () => {
@@ -25,9 +24,7 @@ const Profile = () => {
   const [location, setLocation] = useState("");
   const [phone, setPhone] = useState("");
   const [portfolioImages, setPortfolioImages] = useState<string[]>([]);
-  const [portfolioVideos, setPortfolioVideos] = useState<string[]>([]);
   const [uploadImageURL, setUploadImageURL] = useState("");
-  const [uploadVideoURL, setUploadVideoURL] = useState("");
   const { toast } = useToast();
 
   // Fetch artist profile for this user, if artist
@@ -46,14 +43,12 @@ const Profile = () => {
               location: data.location || "",
               phone: data.phone || "",
               portfolio_images: data.portfolio_images || [],
-              portfolio_videos: data.portfolio_videos ?? [],
             });
             setBio(data.bio || "");
             setSpecialty(data.specialty || "");
             setLocation(data.location || "");
             setPhone(data.phone || "");
             setPortfolioImages(data.portfolio_images || []);
-            setPortfolioVideos(data.portfolio_videos ?? []);
           }
         });
     }
@@ -90,7 +85,6 @@ const Profile = () => {
       .update({
         bio, specialty, location, phone,
         portfolio_images: portfolioImages,
-        portfolio_videos: portfolioVideos,
       })
       .eq("id", user.id);
 
@@ -112,18 +106,6 @@ const Profile = () => {
   // Remove image from portfolio
   const removePortfolioImage = (idx: number) => {
     setPortfolioImages(portfolioImages.filter((_, i) => i !== idx));
-  };
-
-  // Add Video URL to portfolio
-  const addPortfolioVideo = () => {
-    if (uploadVideoURL.trim()) {
-      setPortfolioVideos([...portfolioVideos, uploadVideoURL]);
-      setUploadVideoURL("");
-    }
-  };
-  // Remove video from portfolio
-  const removePortfolioVideo = (idx: number) => {
-    setPortfolioVideos(portfolioVideos.filter((_, i) => i !== idx));
   };
 
   return (
@@ -187,26 +169,6 @@ const Profile = () => {
                     <Button type="button" onClick={addPortfolioImage}>Add</Button>
                   </div>
                 </div>
-                
-                {/* Videos */}
-                <label className="block mt-6 mb-2 font-medium">Portfolio Videos</label>
-                <div className="flex gap-3 mb-2 flex-wrap">
-                  {portfolioVideos.map((vid, i) => (
-                    <div key={i} className="relative group">
-                      <video src={vid} controls className="w-28 h-20 rounded object-cover bg-black" />
-                      <Button size="icon" className="absolute -top-2 -right-2" variant="destructive" onClick={() => removePortfolioVideo(i)}>✖</Button>
-                    </div>
-                  ))}
-                  <div className="flex gap-2 items-center">
-                    <Input
-                      placeholder="Paste video URL"
-                      value={uploadVideoURL}
-                      onChange={e => setUploadVideoURL(e.target.value)}
-                      className="w-44"
-                    />
-                    <Button type="button" onClick={addPortfolioVideo}>Add</Button>
-                  </div>
-                </div>
                 <Button className="mt-6" onClick={saveArtistProfile}>Save</Button>
               </div>
             ) : (
@@ -220,9 +182,6 @@ const Profile = () => {
                   <div className="grid grid-cols-3 gap-4 mt-2">
                     {portfolioImages.map((img, idx) => (
                       <img key={idx} src={img} alt={`Portfolio ${idx + 1}`} className="rounded-lg w-full h-32 object-cover" />
-                    ))}
-                    {portfolioVideos.map((vid, idx) => (
-                      <video key={idx} src={vid} className="rounded-lg w-full h-32 object-cover" controls />
                     ))}
                   </div>
                 </div>
