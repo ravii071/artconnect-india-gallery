@@ -1,19 +1,75 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Palette } from "lucide-react";
-import { Link } from "react-router-dom";
+import { ArrowLeft, Palette, Eye, EyeOff } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useForm } from "react-hook-form";
+
+interface SignUpForm {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  userType: 'client' | 'artist';
+}
+
+interface SignInForm {
+  email: string;
+  password: string;
+}
 
 const Auth = () => {
-  const [userType, setUserType] = useState<"client" | "artist">("client");
+  const [activeTab, setActiveTab] = useState("signin");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const { signUp, signIn, signInWithGoogle, user } = useAuth();
+  const navigate = useNavigate();
 
-  const handleGoogleSignIn = () => {
-    // TODO: Implement Google Sign-in with Supabase
-    console.log("Google Sign-in clicked");
+  const signUpForm = useForm<SignUpForm>({
+    defaultValues: {
+      userType: 'client'
+    }
+  });
+
+  const signInForm = useForm<SignInForm>();
+
+  useEffect(() => {
+    if (user) {
+      navigate('/');
+    }
+  }, [user, navigate]);
+
+  const handleSignUp = async (data: SignUpForm) => {
+    if (data.password !== data.confirmPassword) {
+      signUpForm.setError('confirmPassword', {
+        type: 'manual',
+        message: 'Passwords do not match'
+      });
+      return;
+    }
+
+    setLoading(true);
+    await signUp(data.email, data.password, data.userType);
+    setLoading(false);
+  };
+
+  const handleSignIn = async (data: SignInForm) => {
+    setLoading(true);
+    const { error } = await signIn(data.email, data.password);
+    if (!error) {
+      navigate('/');
+    }
+    setLoading(false);
+  };
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    await signInWithGoogle();
+    setLoading(false);
   };
 
   return (
@@ -41,27 +97,145 @@ const Auth = () => {
             <CardTitle className="text-center">Welcome to ArtConnect</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* User Type Selection */}
-            <div className="space-y-3">
-              <Label>I am a:</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <Button
-                  variant={userType === "client" ? "default" : "outline"}
-                  onClick={() => setUserType("client")}
-                  className={userType === "client" ? "bg-gradient-to-r from-orange-500 to-pink-500" : ""}
-                >
-                  Art Lover
-                </Button>
-                <Button
-                  variant={userType === "artist" ? "default" : "outline"}
-                  onClick={() => setUserType("artist")}
-                  className={userType === "artist" ? "bg-gradient-to-r from-orange-500 to-pink-500" : ""}
-                >
-                  <Palette className="w-4 h-4 mr-2" />
-                  Artist
-                </Button>
-              </div>
-            </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="signin">Sign In</TabsTrigger>
+                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="signin" className="space-y-4">
+                <form onSubmit={signInForm.handleSubmit(handleSignIn)} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-email">Email</Label>
+                    <Input
+                      id="signin-email"
+                      type="email"
+                      placeholder="your@email.com"
+                      {...signInForm.register('email', { required: 'Email is required' })}
+                    />
+                    {signInForm.formState.errors.email && (
+                      <p className="text-sm text-red-500">{signInForm.formState.errors.email.message}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-password">Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="signin-password"
+                        type={showPassword ? "text" : "password"}
+                        {...signInForm.register('password', { required: 'Password is required' })}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    {signInForm.formState.errors.password && (
+                      <p className="text-sm text-red-500">{signInForm.formState.errors.password.message}</p>
+                    )}
+                  </div>
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-gradient-to-r from-orange-500 to-pink-500"
+                    disabled={loading}
+                  >
+                    {loading ? "Signing in..." : "Sign In"}
+                  </Button>
+                </form>
+              </TabsContent>
+
+              <TabsContent value="signup" className="space-y-4">
+                <form onSubmit={signUpForm.handleSubmit(handleSignUp)} className="space-y-4">
+                  {/* User Type Selection */}
+                  <div className="space-y-3">
+                    <Label>I am a:</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        type="button"
+                        variant={signUpForm.watch('userType') === "client" ? "default" : "outline"}
+                        onClick={() => signUpForm.setValue('userType', 'client')}
+                        className={signUpForm.watch('userType') === "client" ? "bg-gradient-to-r from-orange-500 to-pink-500" : ""}
+                      >
+                        Art Lover
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={signUpForm.watch('userType') === "artist" ? "default" : "outline"}
+                        onClick={() => signUpForm.setValue('userType', 'artist')}
+                        className={signUpForm.watch('userType') === "artist" ? "bg-gradient-to-r from-orange-500 to-pink-500" : ""}
+                      >
+                        <Palette className="w-4 h-4 mr-2" />
+                        Artist
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-email">Email</Label>
+                    <Input
+                      id="signup-email"
+                      type="email"
+                      placeholder="your@email.com"
+                      {...signUpForm.register('email', { required: 'Email is required' })}
+                    />
+                    {signUpForm.formState.errors.email && (
+                      <p className="text-sm text-red-500">{signUpForm.formState.errors.email.message}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-password">Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="signup-password"
+                        type={showPassword ? "text" : "password"}
+                        {...signUpForm.register('password', { 
+                          required: 'Password is required',
+                          minLength: { value: 6, message: 'Password must be at least 6 characters' }
+                        })}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    {signUpForm.formState.errors.password && (
+                      <p className="text-sm text-red-500">{signUpForm.formState.errors.password.message}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password">Confirm Password</Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      {...signUpForm.register('confirmPassword', { required: 'Please confirm your password' })}
+                    />
+                    {signUpForm.formState.errors.confirmPassword && (
+                      <p className="text-sm text-red-500">{signUpForm.formState.errors.confirmPassword.message}</p>
+                    )}
+                  </div>
+
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-gradient-to-r from-orange-500 to-pink-500"
+                    disabled={loading}
+                  >
+                    {loading ? "Creating account..." : "Create Account"}
+                  </Button>
+                </form>
+              </TabsContent>
+            </Tabs>
 
             {/* Google Sign-in */}
             <div className="space-y-4">
@@ -70,7 +244,7 @@ const Auth = () => {
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-gray-500">Continue with</span>
+                  <span className="bg-white px-2 text-gray-500">or continue with</span>
                 </div>
               </div>
               
@@ -78,6 +252,7 @@ const Auth = () => {
                 onClick={handleGoogleSignIn}
                 variant="outline" 
                 className="w-full"
+                disabled={loading}
               >
                 <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                   <path fill="#4285f4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
