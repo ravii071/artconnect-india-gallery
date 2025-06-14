@@ -40,6 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasRedirected, setHasRedirected] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -67,56 +68,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 user_type: profileData.user_type as 'artist' | 'client'
               });
 
-              // Handle Google OAuth redirect for artists
+              // Handle Google OAuth redirect for artists - only on SIGNED_IN event
               const pendingUserType = localStorage.getItem('pendingUserType');
               
-              if (event === 'SIGNED_IN' && pendingUserType === 'artist') {
-                // Update profile with artist user type if not set
-                if (!profileData.user_type || profileData.user_type !== 'artist') {
+              if (event === 'SIGNED_IN' && pendingUserType && !hasRedirected) {
+                setHasRedirected(true);
+                
+                if (pendingUserType === 'artist') {
+                  // Update profile with artist user type if not set
+                  if (!profileData.user_type || profileData.user_type !== 'artist') {
+                    await supabase
+                      .from('profiles')
+                      .update({ user_type: 'artist' })
+                      .eq('id', session.user.id);
+                  }
+                  
+                  // Create empty artist profile
                   await supabase
-                    .from('profiles')
-                    .update({ user_type: 'artist' })
-                    .eq('id', session.user.id);
+                    .from('artist_profiles')
+                    .upsert(
+                      {
+                        id: session.user.id,
+                        specialty: '',
+                        location: '',
+                        phone: '',
+                        bio: '',
+                        portfolio_images: [],
+                      },
+                      { onConflict: 'id' }
+                    );
+                  
+                  localStorage.removeItem('pendingUserType');
+                  setTimeout(() => {
+                    window.location.href = '/complete-profile';
+                  }, 500);
+                  return;
+                } else if (pendingUserType === 'client') {
+                  // Update profile with client user type if not set
+                  if (!profileData.user_type || profileData.user_type !== 'client') {
+                    await supabase
+                      .from('profiles')
+                      .update({ user_type: 'client' })
+                      .eq('id', session.user.id);
+                  }
+                  
+                  localStorage.removeItem('pendingUserType');
+                  setTimeout(() => {
+                    window.location.href = '/';
+                  }, 500);
+                  return;
                 }
-                
-                // Create empty artist profile
-                await supabase
-                  .from('artist_profiles')
-                  .upsert(
-                    {
-                      id: session.user.id,
-                      specialty: '',
-                      location: '',
-                      phone: '',
-                      bio: '',
-                      portfolio_images: [],
-                    },
-                    { onConflict: 'id' }
-                  );
-                
-                localStorage.removeItem('pendingUserType');
-                setTimeout(() => {
-                  window.location.href = '/complete-profile';
-                }, 500);
-                return;
-              } else if (event === 'SIGNED_IN' && pendingUserType === 'client') {
-                // Update profile with client user type if not set
-                if (!profileData.user_type || profileData.user_type !== 'client') {
-                  await supabase
-                    .from('profiles')
-                    .update({ user_type: 'client' })
-                    .eq('id', session.user.id);
-                }
-                
-                localStorage.removeItem('pendingUserType');
-                setTimeout(() => {
-                  window.location.href = '/';
-                }, 500);
-                return;
               }
 
-              // Check if this is an artist who needs to complete profile
-              if (profileData.user_type === 'artist') {
+              // Check if this is an artist who needs to complete profile (only if not already redirected)
+              if (profileData.user_type === 'artist' && !hasRedirected && event !== 'INITIAL_SESSION') {
                 const { data: artistProfile } = await supabase
                   .from('artist_profiles')
                   .select('specialty, location, phone')
@@ -129,6 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 if (!artistProfile || !artistProfile.specialty || !artistProfile.location || !artistProfile.phone) {
                   if (window.location.pathname !== '/complete-profile') {
                     console.log('Redirecting to complete profile');
+                    setHasRedirected(true);
                     setTimeout(() => {
                       window.location.href = '/complete-profile';
                     }, 500);
@@ -137,8 +143,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
               }
 
-              // If we're on auth page and user is fully set up, redirect to home
-              if (window.location.pathname === '/auth') {
+              // If we're on auth page and user is fully set up, redirect to home (only once)
+              if (window.location.pathname === '/auth' && !hasRedirected) {
+                setHasRedirected(true);
                 setTimeout(() => {
                   window.location.href = '/';
                 }, 500);
@@ -150,6 +157,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }, 0);
         } else {
           setProfile(null);
+          setHasRedirected(false); // Reset redirect flag when user logs out
         }
         
         setLoading(false);
@@ -165,7 +173,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [hasRedirected]);
 
   const signUp = async (email: string, password: string, userType: 'artist' | 'client') => {
     const redirectUrl = `${window.location.origin}/`;
@@ -240,6 +248,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setSession(null);
     setProfile(null);
+    setHasRedirected(false);
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
