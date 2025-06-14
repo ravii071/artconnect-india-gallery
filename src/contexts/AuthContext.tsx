@@ -40,10 +40,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [hasRedirected, setHasRedirected] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
+    let redirectHandled = false;
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -51,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(session);
         setUser(session?.user ?? null);
         
-        if (session?.user) {
+        if (session?.user && !redirectHandled) {
           // Fetch user profile
           setTimeout(async () => {
             const { data: profileData } = await supabase
@@ -68,11 +69,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 user_type: profileData.user_type as 'artist' | 'client'
               });
 
-              // Handle Google OAuth redirect for artists - only on SIGNED_IN event
+              // Handle Google OAuth redirect for new users
               const pendingUserType = localStorage.getItem('pendingUserType');
               
-              if (event === 'SIGNED_IN' && pendingUserType && !hasRedirected) {
-                setHasRedirected(true);
+              if (event === 'SIGNED_IN' && pendingUserType) {
+                redirectHandled = true;
                 
                 if (pendingUserType === 'artist') {
                   // Update profile with artist user type if not set
@@ -120,8 +121,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
               }
 
-              // Check if this is an artist who needs to complete profile (only if not already redirected)
-              if (profileData.user_type === 'artist' && !hasRedirected && event !== 'INITIAL_SESSION') {
+              // Check if this is an artist who needs to complete profile (only for existing users)
+              if (profileData.user_type === 'artist' && !pendingUserType && !redirectHandled) {
                 const { data: artistProfile } = await supabase
                   .from('artist_profiles')
                   .select('specialty, location, phone')
@@ -134,18 +135,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 if (!artistProfile || !artistProfile.specialty || !artistProfile.location || !artistProfile.phone) {
                   if (window.location.pathname !== '/complete-profile') {
                     console.log('Redirecting to complete profile');
-                    setHasRedirected(true);
+                    redirectHandled = true;
                     setTimeout(() => {
                       window.location.href = '/complete-profile';
                     }, 500);
+                    return;
                   }
-                  return;
                 }
               }
 
               // If we're on auth page and user is fully set up, redirect to home (only once)
-              if (window.location.pathname === '/auth' && !hasRedirected) {
-                setHasRedirected(true);
+              if (window.location.pathname === '/auth' && !redirectHandled && !pendingUserType) {
+                redirectHandled = true;
                 setTimeout(() => {
                   window.location.href = '/';
                 }, 500);
@@ -155,9 +156,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               console.log('No profile found for user, this is unexpected');
             }
           }, 0);
-        } else {
+        } else if (!session?.user) {
           setProfile(null);
-          setHasRedirected(false); // Reset redirect flag when user logs out
+          redirectHandled = false; // Reset redirect flag when user logs out
         }
         
         setLoading(false);
@@ -173,7 +174,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => subscription.unsubscribe();
-  }, [hasRedirected]);
+  }, []);
 
   const signUp = async (email: string, password: string, userType: 'artist' | 'client') => {
     const redirectUrl = `${window.location.origin}/`;
@@ -248,7 +249,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setSession(null);
     setProfile(null);
-    setHasRedirected(false);
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
