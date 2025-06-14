@@ -14,7 +14,7 @@ interface ArtistProfileData {
   location: string | null;
   phone: string | null;
   portfolio_images: string[] | null;
-  portfolio_videos: string[] | null;
+  portfolio_videos: string[] | null; // Allow null
 }
 
 const Profile = () => {
@@ -47,7 +47,7 @@ const Profile = () => {
             setLocation(data.location || "");
             setPhone(data.phone || "");
             setPortfolioImages(data.portfolio_images || []);
-            setPortfolioVideos(data.portfolio_videos || []);
+            setPortfolioVideos(data.portfolio_videos || []); // Accept null, set as []
           }
         });
     }
