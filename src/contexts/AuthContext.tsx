@@ -45,132 +45,137 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   
   const processedUsers = useRef(new Set<string>());
 
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session);
-        setSession(session);
-        setUser(session?.user ?? null);
+  const handleAuthStateChange = async (event: string, session: Session | null) => {
+    console.log('Auth state changed:', event, session);
+    
+    // Always update session and user first
+    setSession(session);
+    setUser(session?.user ?? null);
 
-        if (session?.user && !processedUsers.current.has(session.user.id)) {
-          processedUsers.current.add(session.user.id);
+    // If no session, clear everything and stop loading
+    if (!session?.user) {
+      setProfile(null);
+      processedUsers.current.clear();
+      setLoading(false);
+      return;
+    }
 
-          // Fetch user profile
-          let profileFetchError = null;
-          let profileData = null;
-          try {
-            const { data, error } = await supabase
+    const userId = session.user.id;
+
+    // If we already processed this user, just clear loading
+    if (processedUsers.current.has(userId)) {
+      console.log('User already processed, clearing loading');
+      setLoading(false);
+      return;
+    }
+
+    // Mark user as being processed
+    processedUsers.current.add(userId);
+
+    try {
+      // Fetch user profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+
+      console.log('Fetched profile data:', profileData);
+
+      if (profileData) {
+        setProfile({
+          ...profileData,
+          user_type: profileData.user_type as 'artist' | 'client'
+        });
+
+        // Handle Google OAuth redirects
+        const pendingUserType = localStorage.getItem('pendingUserType');
+        if (pendingUserType) {
+          localStorage.removeItem('pendingUserType');
+
+          if (pendingUserType === 'artist') {
+            await supabase
               .from('profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
-            profileData = data;
-            profileFetchError = error;
-          } catch (e) {
-            profileFetchError = e;
-          }
+              .update({ user_type: 'artist' })
+              .eq('id', userId);
 
-          if (profileFetchError) {
-            console.error('Error fetching profile:', profileFetchError);
-            setProfile(null);
-            setLoading(false);
+            await supabase
+              .from('artist_profiles')
+              .upsert(
+                {
+                  id: userId,
+                  specialty: '',
+                  location: '',
+                  phone: '',
+                  bio: '',
+                  portfolio_images: [],
+                },
+                { onConflict: 'id' }
+              );
+
+            window.location.href = '/complete-profile';
+            return;
+          } else if (pendingUserType === 'client') {
+            await supabase
+              .from('profiles')
+              .update({ user_type: 'client' })
+              .eq('id', userId);
+
+            window.location.href = '/';
             return;
           }
+        }
 
-          console.log('Fetched profile data:', profileData);
-
-          if (profileData) {
-            setProfile({
-              ...profileData,
-              user_type: profileData.user_type as 'artist' | 'client'
-            });
-
-            // Handle Google OAuth redirects
-            const pendingUserType = localStorage.getItem('pendingUserType');
-
-            if (pendingUserType) {
-              localStorage.removeItem('pendingUserType');
-
-              if (pendingUserType === 'artist') {
-                await supabase
-                  .from('profiles')
-                  .update({ user_type: 'artist' })
-                  .eq('id', session.user.id);
-
-                await supabase
-                  .from('artist_profiles')
-                  .upsert(
-                    {
-                      id: session.user.id,
-                      specialty: '',
-                      location: '',
-                      phone: '',
-                      bio: '',
-                      portfolio_images: [],
-                    },
-                    { onConflict: 'id' }
-                  );
-
-                window.location.href = '/complete-profile';
-                setLoading(false);
-                return;
-              } else if (pendingUserType === 'client') {
-                await supabase
-                  .from('profiles')
-                  .update({ user_type: 'client' })
-                  .eq('id', session.user.id);
-
-                window.location.href = '/';
-                setLoading(false);
-                return;
-              }
-            }
-
-            // Check if artist has incomplete profile (and redirect if necessary)
-            if (profileData.user_type === 'artist') {
-              const { data: artistProfile } = await supabase
-                .from('artist_profiles')
-                .select('specialty, location, phone')
-                .eq('id', session.user.id)
-                .maybeSingle();
-              console.log('Artist profile:', artistProfile);
-              if (!artistProfile || !artistProfile.specialty || !artistProfile.location || !artistProfile.phone) {
-                if (window.location.pathname !== '/complete-profile') {
-                  window.location.href = '/complete-profile';
-                  setLoading(false);
-                  return;
-                }
-              }
-            }
-
-            // Redirect from auth page to home if user is fully set up
-            if (window.location.pathname === '/auth') {
-              window.location.href = '/';
-              setLoading(false);
+        // Check if artist has incomplete profile
+        if (profileData.user_type === 'artist') {
+          const { data: artistProfile } = await supabase
+            .from('artist_profiles')
+            .select('specialty, location, phone')
+            .eq('id', userId)
+            .maybeSingle();
+          
+          console.log('Artist profile:', artistProfile);
+          
+          if (!artistProfile || !artistProfile.specialty || !artistProfile.location || !artistProfile.phone) {
+            if (window.location.pathname !== '/complete-profile') {
+              window.location.href = '/complete-profile';
               return;
             }
           }
-          
-          setLoading(false);
-        } else if (session?.user && processedUsers.current.has(session.user.id)) {
-          // User already processed, just clear loading
-          setLoading(false);
-        } else if (!session?.user) {
-          setProfile(null);
-          processedUsers.current.clear();
-          setLoading(false);
-        } else {
-          // Fallback case
-          setLoading(false);
+        }
+
+        // Redirect from auth page to home if user is fully set up
+        if (window.location.pathname === '/auth') {
+          window.location.href = '/';
+          return;
         }
       }
-    );
+    } catch (error) {
+      console.error('Error in auth state change:', error);
+      setProfile(null);
+    }
 
+    // Always clear loading at the end
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange);
+
+    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('Initial session:', session);
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (!session) {
+      if (session) {
+        handleAuthStateChange('INITIAL', session);
+      } else {
         setLoading(false);
       }
     });
