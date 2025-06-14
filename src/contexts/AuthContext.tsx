@@ -43,7 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   
-  const hasRedirectedRef = useRef(false);
+  const processedUsers = useRef(new Set<string>());
 
   useEffect(() => {
     // Set up auth state listener
@@ -53,95 +53,91 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(session);
         setUser(session?.user ?? null);
         
-        if (session?.user) {
+        if (session?.user && !processedUsers.current.has(session.user.id)) {
+          processedUsers.current.add(session.user.id);
+          
           // Fetch user profile
-          setTimeout(async () => {
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
-            
-            console.log('Profile data:', profileData);
-            
-            if (profileData) {
-              setProfile({
-                ...profileData,
-                user_type: profileData.user_type as 'artist' | 'client'
-              });
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          
+          console.log('Profile data:', profileData);
+          
+          if (profileData) {
+            setProfile({
+              ...profileData,
+              user_type: profileData.user_type as 'artist' | 'client'
+            });
 
-              // Simple Google OAuth redirect logic
-              const pendingUserType = localStorage.getItem('pendingUserType');
+            // Handle Google OAuth redirects
+            const pendingUserType = localStorage.getItem('pendingUserType');
+            
+            if (pendingUserType) {
+              localStorage.removeItem('pendingUserType');
               
-              if (pendingUserType && !hasRedirectedRef.current) {
-                hasRedirectedRef.current = true;
+              if (pendingUserType === 'artist') {
+                // Update profile to artist type
+                await supabase
+                  .from('profiles')
+                  .update({ user_type: 'artist' })
+                  .eq('id', session.user.id);
                 
-                if (pendingUserType === 'artist') {
-                  // Update profile to artist type
-                  await supabase
-                    .from('profiles')
-                    .update({ user_type: 'artist' })
-                    .eq('id', session.user.id);
-                  
-                  // Create artist profile
-                  await supabase
-                    .from('artist_profiles')
-                    .upsert(
-                      {
-                        id: session.user.id,
-                        specialty: '',
-                        location: '',
-                        phone: '',
-                        bio: '',
-                        portfolio_images: [],
-                      },
-                      { onConflict: 'id' }
-                    );
-                  
-                  localStorage.removeItem('pendingUserType');
-                  window.location.href = '/complete-profile';
-                  return;
-                } else if (pendingUserType === 'client') {
-                  // Update profile to client type
-                  await supabase
-                    .from('profiles')
-                    .update({ user_type: 'client' })
-                    .eq('id', session.user.id);
-                  
-                  localStorage.removeItem('pendingUserType');
-                  window.location.href = '/';
-                  return;
-                }
-              }
-
-              // Check if artist needs to complete profile
-              if (profileData.user_type === 'artist' && !hasRedirectedRef.current) {
-                const { data: artistProfile } = await supabase
+                // Create artist profile
+                await supabase
                   .from('artist_profiles')
-                  .select('specialty, location, phone')
-                  .eq('id', session.user.id)
-                  .maybeSingle();
-
-                // If artist profile is incomplete, redirect to complete profile
-                if (!artistProfile || !artistProfile.specialty || !artistProfile.location || !artistProfile.phone) {
-                  if (window.location.pathname !== '/complete-profile') {
-                    hasRedirectedRef.current = true;
-                    window.location.href = '/complete-profile';
-                    return;
-                  }
-                }
-              }
-
-              // Redirect from auth page to home if user is fully set up
-              if (window.location.pathname === '/auth' && !hasRedirectedRef.current) {
-                hasRedirectedRef.current = true;
+                  .upsert(
+                    {
+                      id: session.user.id,
+                      specialty: '',
+                      location: '',
+                      phone: '',
+                      bio: '',
+                      portfolio_images: [],
+                    },
+                    { onConflict: 'id' }
+                  );
+                
+                window.location.href = '/complete-profile';
+                return;
+              } else if (pendingUserType === 'client') {
+                // Update profile to client type
+                await supabase
+                  .from('profiles')
+                  .update({ user_type: 'client' })
+                  .eq('id', session.user.id);
+                
                 window.location.href = '/';
+                return;
               }
             }
-          }, 0);
-        } else {
+
+            // Check if artist needs to complete profile (only for existing artists)
+            if (profileData.user_type === 'artist') {
+              const { data: artistProfile } = await supabase
+                .from('artist_profiles')
+                .select('specialty, location, phone')
+                .eq('id', session.user.id)
+                .maybeSingle();
+
+              // If artist profile is incomplete, redirect to complete profile
+              if (!artistProfile || !artistProfile.specialty || !artistProfile.location || !artistProfile.phone) {
+                if (window.location.pathname !== '/complete-profile') {
+                  window.location.href = '/complete-profile';
+                  return;
+                }
+              }
+            }
+
+            // Redirect from auth page to home if user is fully set up
+            if (window.location.pathname === '/auth') {
+              window.location.href = '/';
+            }
+          }
+        } else if (!session?.user) {
           setProfile(null);
-          hasRedirectedRef.current = false;
+          processedUsers.current.clear();
         }
         
         setLoading(false);
@@ -153,7 +149,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Initial session:', session);
       setSession(session);
       setUser(session?.user ?? null);
-      setLoading(false);
+      if (!session) {
+        setLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -232,7 +230,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setSession(null);
     setProfile(null);
-    hasRedirectedRef.current = false;
+    processedUsers.current.clear();
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
