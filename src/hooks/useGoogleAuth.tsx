@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,117 +25,45 @@ export const useGoogleAuth = () => {
     }
   };
 
-  const handleRoleSelection = async (userType: "artist" | "client") => {
-    if (!user) return;
+  useEffect(() => {
+    const handleGoogleSignUpFlow = async () => {
+      if (!user) return;
 
-    try {
-      // Update profile with user type
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({ 
-          user_type: userType,
-          is_profile_complete: userType === "client" // clients are complete by default
-        })
-        .eq("id", user.id);
+      const pendingUserType = localStorage.getItem("pendingUserType");
+      const isGoogleSignUp = localStorage.getItem("pendingGoogleSignUp") === "true";
 
-      if (profileError) {
-        console.error("Error updating profile:", profileError);
-        return;
-      }
+      if (isGoogleSignUp && pendingUserType && profile) {
+        // New Google user, assign role and route accordingly
+        try {
+          await supabase
+            .from("profiles")
+            .update({
+              user_type: pendingUserType,
+              is_profile_complete: pendingUserType === "client"
+            })
+            .eq("id", user.id);
 
-      // If artist, create artist profile and redirect to complete profile
-      if (userType === "artist") {
-        const { error: artistError } = await supabase
-          .from("artist_profiles")
-          .upsert(
-            {
+          if (pendingUserType === "artist") {
+            await supabase.from("artist_profiles").upsert({
               id: user.id,
               specialty: "",
               location: "",
               bio: "",
               phone: "",
-              portfolio_images: [],
-            },
-            { onConflict: "id" }
-          );
+              portfolio_images: []
+            }, { onConflict: "id" });
 
-        if (artistError) {
-          console.error("Error creating artist profile:", artistError);
-        }
-
-        setShowRoleSelection(false);
-        navigate("/complete-artist-profile");
-      } else {
-        // Customer - redirect to home
-        setShowRoleSelection(false);
-        navigate("/home");
-      }
-    } catch (error) {
-      console.error("Error in role selection:", error);
-    }
-  };
-
-  // Handle Google sign-up flow after authentication
-  useEffect(() => {
-    const handleGoogleSignUpFlow = async () => {
-      if (!user || !profile) return;
-
-      const pendingUserType = localStorage.getItem("pendingUserType");
-      const isGoogleSignUp = localStorage.getItem("pendingGoogleSignUp") === "true";
-
-      if (isGoogleSignUp && pendingUserType) {
-        console.log("Processing Google sign-up flow", { pendingUserType, userId: user.id });
-
-        try {
-          // Update profile with user type
-          const { error: profileError } = await supabase
-            .from("profiles")
-            .update({ 
-              user_type: pendingUserType,
-              is_profile_complete: pendingUserType === "client" // clients are complete by default
-            })
-            .eq("id", user.id);
-
-          if (profileError) {
-            console.error("Error updating profile:", profileError);
-            return;
-          }
-
-          // If artist, create artist profile and redirect to complete profile
-          if (pendingUserType === "artist") {
-            const { error: artistError } = await supabase
-              .from("artist_profiles")
-              .upsert(
-                {
-                  id: user.id,
-                  specialty: "",
-                  location: "",
-                  bio: "",
-                  phone: "",
-                  portfolio_images: [],
-                },
-                { onConflict: "id" }
-              );
-
-            if (artistError) {
-              console.error("Error creating artist profile:", artistError);
-            }
-
-            // Clean up and redirect to complete profile
             localStorage.removeItem("pendingUserType");
             localStorage.removeItem("pendingGoogleSignUp");
             setPendingGoogleSignUp(false);
-            
-            console.log("Redirecting artist to complete profile");
+
             navigate("/complete-artist-profile");
             return;
           } else {
-            // Customer - redirect to home
             localStorage.removeItem("pendingUserType");
             localStorage.removeItem("pendingGoogleSignUp");
             setPendingGoogleSignUp(false);
-            
-            console.log("Redirecting customer to home");
+
             navigate("/home");
             return;
           }
@@ -145,19 +72,19 @@ export const useGoogleAuth = () => {
         }
       }
 
-      // Check if user needs role selection (Google OAuth without prior role selection)
-      if (user && profile && !profile.user_type && !isGoogleSignUp) {
-        setShowRoleSelection(true);
+      // Normal Google login (existing user), if no role, go to /select-role
+      if (user && profile && !profile.user_type) {
+        navigate("/select-role");
       }
     };
 
     handleGoogleSignUpFlow();
+    // eslint-disable-next-line
   }, [user, profile, navigate]);
 
   return {
     handleGoogleSignIn,
-    handleRoleSelection,
     pendingGoogleSignUp,
-    showRoleSelection
+    showRoleSelection: false // not needed, just for compatibility
   };
 };

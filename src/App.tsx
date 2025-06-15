@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,6 +15,7 @@ import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
 import CompleteArtistProfile from "./pages/CompleteArtistProfile";
+import SelectRole from "./pages/SelectRole";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +31,7 @@ const App = () => (
             <Route path="/home" element={<ProtectedRoute requireAuth={true} userType="client"><Home /></ProtectedRoute>} />
             <Route path="/artist/:id" element={<ArtistProfile />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/select-role" element={<ProtectedRoute requireAuth={true}><SelectRole /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute requireAuth={true}><Profile /></ProtectedRoute>} />
             <Route 
               path="/booking/:id" 
