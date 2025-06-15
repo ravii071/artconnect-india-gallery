@@ -16,6 +16,7 @@ import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
 import CompleteArtistProfile from "./pages/CompleteArtistProfile";
 import SelectRole from "./pages/SelectRole";
+import CompleteProfile from "./pages/CompleteProfile";
 
 const queryClient = new QueryClient();
 
@@ -31,7 +32,6 @@ const App = () => (
             <Route path="/home" element={<ProtectedRoute requireAuth={true} userType="client"><Home /></ProtectedRoute>} />
             <Route path="/artist/:id" element={<ArtistProfile />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/select-role" element={<ProtectedRoute requireAuth={true}><SelectRole /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute requireAuth={true}><Profile /></ProtectedRoute>} />
             <Route 
               path="/booking/:id" 
@@ -51,6 +51,7 @@ const App = () => (
               } 
             />
             <Route path="/complete-artist-profile" element={<ProtectedRoute requireAuth={true} userType="artist"><CompleteArtistProfile /></ProtectedRoute>} />
+            <Route path="/complete-profile" element={<ProtectedRoute requireAuth={true}><CompleteProfile /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

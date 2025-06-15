@@ -1,113 +1,73 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthForm } from "@/components/auth/AuthForm";
-import SelectRole from "./SelectRole";
 import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 
 const Auth: React.FC = () => {
   const { signIn, signUp, profile, user } = useAuth();
-  const { handleGoogleSignIn, pendingGoogleSignUp } = useGoogleAuth();
+  const { handleGoogleSignIn } = useGoogleAuth();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [artistProfile, setArtistProfile] = useState<any>(null);
   const navigate = useNavigate();
 
-  // Fetch artist profile after sign in, if user is an artist
+  // Redirect after login if profile NOT complete
   useEffect(() => {
-    const fetchArtistProfile = async () => {
-      if (user && profile?.user_type === "artist") {
-        const { data } = await supabase
-          .from("artist_profiles")
-          .select("*")
-          .eq("id", user.id)
-          .maybeSingle();
-        setArtistProfile(data);
+    if (user) {
+      // If profile missing or profile.is_profile_complete === false, require completion
+      if (!profile || !profile.is_profile_complete) {
+        navigate("/complete-profile");
       } else {
-        setArtistProfile(null);
+        // Route by user type
+        if (profile.user_type === "artist") {
+          navigate("/dashboard");
+        } else {
+          navigate("/home");
+        }
       }
-    };
-    fetchArtistProfile();
-  }, [user, profile]);
+    }
+  }, [user, profile, navigate]);
 
+  // Simplified: only email/password, no role
   const handleAuth = async (data: any) => {
     setError(null);
     setLoading(true);
-
     try {
       if (data.type === "sign-in") {
         const { error } = await signIn(data.email, data.password);
-        if (!error) {
-          navigate("/");
-        } else {
+        if (error) {
           setError(error.message || "Could not sign in");
         }
       } else {
-        // Sign Up Validation
-        if (!data.userType) {
-          setError("Please select Artist or Customer.");
-          setLoading(false);
-          return;
-        }
+        // Email/password sign up flow
         if (!data.email || !data.password) {
           setError("Email and password are required.");
           setLoading(false);
           return;
         }
-        if (!data.fullName.trim()) {
-          setError("Name is required.");
+        if (!data.fullName || !data.fullName.trim()) {
+          setError("Full name is required.");
           setLoading(false);
           return;
         }
-        if (data.userType === "artist" && (!data.artType.trim() || !data.district.trim())) {
-          setError("Please provide your Art Type and District.");
-          setLoading(false);
-          return;
-        }
-        // Register user in Supabase Auth
-        const { error } = await signUp(data.email, data.password, data.userType);
-        if (error) {
+        const { error } = await signUp(data.email, data.password, "client"); // store as client for now
+        if (!error) {
+          // After successful signup, update full_name
+          setTimeout(async () => {
+            const { data: userData } = await supabase.auth.getUser();
+            if (userData?.user) {
+              const user_id = userData.user.id;
+              await supabase
+                .from("profiles")
+                .update({ full_name: data.fullName })
+                .eq("id", user_id);
+            }
+          }, 1000);
+        } else {
           setError(error.message || "Could not sign up");
-          setLoading(false);
-          return;
         }
-
-        // After signup, update profile with extra info and route
-        setTimeout(async () => {
-          const { data: user } = await supabase.auth.getUser();
-          if (!user?.user) return;
-
-          const user_id = user.user.id;
-
-          await supabase
-            .from("profiles")
-            .update({ 
-              full_name: data.fullName, 
-              user_type: data.userType,
-              is_profile_complete: data.userType === "client"
-            })
-            .eq("id", user_id);
-
-          if (data.userType === "artist") {
-            await supabase
-              .from("artist_profiles")
-              .upsert(
-                {
-                  id: user_id,
-                  specialty: data.artType,
-                  location: data.district,
-                  bio: "",
-                  phone: "",
-                  portfolio_images: [],
-                },
-                { onConflict: "id" }
-              );
-            navigate("/complete-artist-profile");
-          } else {
-            navigate("/home");
-          }
-        }, 1200);
       }
     } catch (err: any) {
       setError(err.message || "An error occurred");
@@ -119,40 +79,14 @@ const Auth: React.FC = () => {
   const handleGoogleAuth = async () => {
     setError(null);
     setLoading(true);
-
     try {
-      await handleGoogleSignIn("sign-in");
+      await handleGoogleSignIn();
     } catch (err: any) {
       setError(err.message || "Google Sign-in failed");
     } finally {
       setLoading(false);
     }
   };
-
-  // All role selection is now handled on the /select-role page
-  // Routing after sign in
-  useEffect(() => {
-    if (user && profile && !pendingGoogleSignUp) {
-      if (!profile.user_type) {
-        navigate("/select-role");
-      } else if (profile.user_type === "artist") {
-        if (
-          !profile.is_profile_complete ||
-          !artistProfile ||
-          !artistProfile.specialty ||
-          !artistProfile.location ||
-          artistProfile.specialty.trim() === "" ||
-          artistProfile.location.trim() === ""
-        ) {
-          navigate("/complete-artist-profile");
-        } else {
-          navigate("/dashboard");
-        }
-      } else if (profile.user_type === "client") {
-        navigate("/home");
-      }
-    }
-  }, [user, profile, artistProfile, pendingGoogleSignUp, navigate]);
 
   return (
     <>
@@ -162,7 +96,6 @@ const Auth: React.FC = () => {
         loading={loading}
         error={error}
       />
-      {/* Role selection UI is now a page, not a modal */}
     </>
   );
 };
