@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,7 +32,7 @@ const Auth: React.FC = () => {
   const navigate = useNavigate();
 
   // new state for tracking Google sign-in with artist selection
-  const [pendingArtistGoogle, setPendingArtistGoogle] = useState(false);
+  const [pendingGoogleSignUp, setPendingGoogleSignUp] = useState(false);
 
   const [artistProfile, setArtistProfile] = useState<any>(null);
 
@@ -144,35 +145,70 @@ const Auth: React.FC = () => {
       setError("Please select Artist or Customer before signing up with Google.");
       return;
     }
+
+    // Store the user type in localStorage for Google signup flow
+    if (authMode === "sign-up") {
+      localStorage.setItem("pendingUserType", userType);
+      setPendingGoogleSignUp(true);
+    }
+
     setLoading(true);
     const { error } = await signInWithGoogle(); // using AuthContext
     setLoading(false);
 
-    // normal redirect will be handled in useEffect below
     if (error) {
       setError(error.message || "Google Sign-in failed");
-    } else if (authMode === "sign-up" && userType === "artist") {
-      setPendingArtistGoogle(true);
+      localStorage.removeItem("pendingUserType");
+      setPendingGoogleSignUp(false);
     }
   };
 
-  // monitor session/profile to redirect artist users to complete profile
-
-  useEffect(() => {
-    // After Google sign in, if new artist, route to profile form
-    // If using sign-up, userType=artist, and Google flow just finished
-    if (pendingArtistGoogle && userType === "artist") {
-      // Check if artist profile is missing fields or just redirect
-      navigate("/complete-artist-profile");
-      setPendingArtistGoogle(false);
-    } else if (user && profile && authMode === "sign-in") {
-      navigate("/");
-    }
-  }, [user, profile, authMode, userType, pendingArtistGoogle, navigate]);
-
-  // Improved redirection logic after sign in/up
+  // Handle redirection after Google authentication
   useEffect(() => {
     if (user && profile) {
+      const pendingUserType = localStorage.getItem("pendingUserType");
+      
+      // If this was a Google sign-up flow
+      if (pendingGoogleSignUp && pendingUserType) {
+        // Update the user's profile with the selected user type
+        const updateGoogleUserProfile = async () => {
+          await supabase
+            .from("profiles")
+            .update({ user_type: pendingUserType })
+            .eq("id", user.id);
+
+          // If artist, create artist profile entry
+          if (pendingUserType === "artist") {
+            await supabase
+              .from("artist_profiles")
+              .upsert(
+                {
+                  id: user.id,
+                  specialty: "",
+                  location: "",
+                  bio: "",
+                  phone: "",
+                  portfolio_images: [],
+                },
+                { onConflict: "id" }
+              );
+            // Redirect to complete artist profile
+            navigate("/complete-artist-profile");
+          } else {
+            // Customer - redirect to home
+            navigate("/");
+          }
+          
+          // Clean up
+          localStorage.removeItem("pendingUserType");
+          setPendingGoogleSignUp(false);
+        };
+
+        updateGoogleUserProfile();
+        return;
+      }
+
+      // Normal sign-in flow redirection
       if (profile.user_type === "artist") {
         // Check for essential info in artist profile
         if (
@@ -190,8 +226,7 @@ const Auth: React.FC = () => {
         navigate("/");
       }
     }
-    // Add artistProfile to deps so this runs after fetching
-  }, [user, profile, artistProfile, navigate]);
+  }, [user, profile, artistProfile, pendingGoogleSignUp, navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center p-4">
