@@ -10,6 +10,7 @@ interface Profile {
   full_name: string | null;
   avatar_url: string | null;
   user_type: 'artist' | 'client';
+  is_profile_complete: boolean;
   created_at: string;
   updated_at: string;
 }
