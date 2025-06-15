@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -172,12 +173,13 @@ const Auth: React.FC = () => {
       if (pendingGoogleSignUp && pendingUserType) {
         // Update the user's profile with the selected user type
         const updateGoogleUserProfile = async () => {
+          // Update the profile first
           await supabase
             .from("profiles")
             .update({ user_type: pendingUserType })
             .eq("id", user.id);
 
-          // If artist, create artist profile entry
+          // If artist, create artist profile entry and redirect to complete profile
           if (pendingUserType === "artist") {
             await supabase
               .from("artist_profiles")
@@ -192,38 +194,45 @@ const Auth: React.FC = () => {
                 },
                 { onConflict: "id" }
               );
-            // Redirect to complete artist profile
+            
+            // Clean up first
+            localStorage.removeItem("pendingUserType");
+            setPendingGoogleSignUp(false);
+            
+            // Force redirect to complete artist profile
             navigate("/complete-artist-profile");
+            return;
           } else {
             // Customer - redirect to home
+            localStorage.removeItem("pendingUserType");
+            setPendingGoogleSignUp(false);
             navigate("/");
+            return;
           }
-          
-          // Clean up
-          localStorage.removeItem("pendingUserType");
-          setPendingGoogleSignUp(false);
         };
 
         updateGoogleUserProfile();
         return;
       }
 
-      // Normal sign-in flow redirection
-      if (profile.user_type === "artist") {
-        // Check for essential info in artist profile
-        if (
-          !artistProfile ||
-          !artistProfile.specialty ||
-          !artistProfile.location ||
-          artistProfile.specialty.trim() === "" ||
-          artistProfile.location.trim() === ""
-        ) {
-          navigate("/complete-artist-profile");
-        } else {
+      // Normal sign-in flow redirection (only if not in Google sign-up flow)
+      if (!pendingGoogleSignUp) {
+        if (profile.user_type === "artist") {
+          // Check for essential info in artist profile
+          if (
+            !artistProfile ||
+            !artistProfile.specialty ||
+            !artistProfile.location ||
+            artistProfile.specialty.trim() === "" ||
+            artistProfile.location.trim() === ""
+          ) {
+            navigate("/complete-artist-profile");
+          } else {
+            navigate("/");
+          }
+        } else if (profile.user_type === "client") {
           navigate("/");
         }
-      } else if (profile.user_type === "client") {
-        navigate("/");
       }
     }
   }, [user, profile, artistProfile, pendingGoogleSignUp, navigate]);
