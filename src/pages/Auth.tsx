@@ -31,6 +31,27 @@ const Auth: React.FC = () => {
   // new state for tracking Google sign-in with artist selection
   const [pendingArtistGoogle, setPendingArtistGoogle] = useState(false);
 
+  const [artistProfile, setArtistProfile] = useState<any>(null);
+
+  // Fetch artist profile after sign in, if user is an artist
+  useEffect(() => {
+    const fetchArtistProfile = async () => {
+      if (user && profile?.user_type === "artist") {
+        // Query artist_profiles
+        const { data, error } = await supabase
+          .from("artist_profiles")
+          .select("*")
+          .eq("id", user.id)
+          .maybeSingle();
+        setArtistProfile(data);
+      } else {
+        setArtistProfile(null);
+      }
+    };
+    fetchArtistProfile();
+    // we only want to refetch when user or profile changes
+  }, [user, profile]);
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -147,6 +168,29 @@ const Auth: React.FC = () => {
       navigate("/");
     }
   }, [user, profile, authMode, userType, pendingArtistGoogle, navigate]);
+
+  // Improved redirection logic after sign in/up
+  useEffect(() => {
+    if (user && profile) {
+      if (profile.user_type === "artist") {
+        // Check for essential info in artist profile
+        if (
+          !artistProfile ||
+          !artistProfile.specialty ||
+          !artistProfile.location ||
+          artistProfile.specialty.trim() === "" ||
+          artistProfile.location.trim() === ""
+        ) {
+          navigate("/complete-artist-profile");
+        } else {
+          navigate("/");
+        }
+      } else if (profile.user_type === "client") {
+        navigate("/");
+      }
+    }
+    // Add artistProfile to deps so this runs after fetching
+  }, [user, profile, artistProfile, navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center p-4">
