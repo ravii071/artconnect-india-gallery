@@ -1,10 +1,11 @@
+
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 
 type AuthMode = "sign-in" | "sign-up";
@@ -113,112 +114,193 @@ const Auth: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-pink-50 to-purple-50">
-      <Card className="max-w-md w-full p-8 mx-2">
-        <div className="mb-6 flex gap-2">
-          <Button 
-            variant={authMode === "sign-in" ? "default" : "outline"}
-            className="w-1/2"
-            onClick={() => setAuthMode("sign-in")}
-          >Sign In</Button>
-          <Button
-            variant={authMode === "sign-up" ? "default" : "outline"}
-            className="w-1/2"
-            onClick={() => setAuthMode("sign-up")}
-          >Sign Up</Button>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Welcome to ArtSpace
+          </h1>
+          <p className="text-gray-600">
+            {authMode === "sign-in" 
+              ? "Sign in to your account" 
+              : "Create your account"
+            }
+          </p>
         </div>
 
-        <form className="flex flex-col gap-4" onSubmit={handleAuth}>
-          <Input
-            type="email"
-            placeholder="Email"
-            value={email}
-            disabled={loading}
-            onChange={e => setEmail(e.target.value)}
-            required
-          />
-          <Input
-            type="password"
-            placeholder="Password"
-            value={password}
-            disabled={loading}
-            onChange={e => setPassword(e.target.value)}
-            required
-          />
+        <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+          <CardHeader className="space-y-1 pb-4">
+            <div className="flex gap-1">
+              <Button 
+                variant={authMode === "sign-in" ? "default" : "ghost"}
+                className={`flex-1 ${authMode === "sign-in" ? 'bg-blue-600 hover:bg-blue-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`}
+                onClick={() => setAuthMode("sign-in")}
+              >
+                Sign In
+              </Button>
+              <Button
+                variant={authMode === "sign-up" ? "default" : "ghost"}
+                className={`flex-1 ${authMode === "sign-up" ? 'bg-blue-600 hover:bg-blue-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`}
+                onClick={() => setAuthMode("sign-up")}
+              >
+                Sign Up
+              </Button>
+            </div>
+          </CardHeader>
 
-          {authMode === "sign-up" && (
-            <>
-              {/* Choose user type */}
-              <label className="block font-medium text-gray-700">
-                I am a:
-              </label>
-              <div className="flex gap-4 mb-2">
-                <Button
-                  type="button"
-                  variant={userType === "client" ? "default" : "outline"}
-                  onClick={() => setUserType("client")}
-                  className="flex-1"
+          <CardContent className="space-y-4">
+            <form className="space-y-4" onSubmit={handleAuth}>
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                  Email address
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
                   disabled={loading}
-                >
-                  Customer
-                </Button>
-                <Button
-                  type="button"
-                  variant={userType === "artist" ? "default" : "outline"}
-                  onClick={() => setUserType("artist")}
-                  className="flex-1"
-                  disabled={loading}
-                >
-                  Artist
-                </Button>
+                  onChange={e => setEmail(e.target.value)}
+                  className="h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                  required
+                />
               </div>
 
-              {/* Name is always required */}
-              <Input
-                placeholder="Full Name"
-                value={fullName}
-                onChange={e => setFullName(e.target.value)}
-                disabled={loading}
-              />
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+                  Password
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  disabled={loading}
+                  onChange={e => setPassword(e.target.value)}
+                  className="h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                  required
+                />
+              </div>
 
-              {/* Show these only for artist */}
-              {userType === "artist" && (
+              {authMode === "sign-up" && (
                 <>
-                  <Input
-                    placeholder="Art Type (e.g. Painter, Sculptor)"
-                    value={artType}
-                    onChange={e => setArtType(e.target.value)}
-                    disabled={loading}
-                  />
-                  <Input
-                    placeholder="District"
-                    value={district}
-                    onChange={e => setDistrict(e.target.value)}
-                    disabled={loading}
-                  />
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-gray-700">
+                      I am a:
+                    </Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        type="button"
+                        variant={userType === "client" ? "default" : "outline"}
+                        onClick={() => setUserType("client")}
+                        className={`h-11 ${userType === "client" ? 'bg-blue-600 hover:bg-blue-700' : 'border-gray-200 hover:bg-gray-50'}`}
+                        disabled={loading}
+                      >
+                        Customer
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={userType === "artist" ? "default" : "outline"}
+                        onClick={() => setUserType("artist")}
+                        className={`h-11 ${userType === "artist" ? 'bg-blue-600 hover:bg-blue-700' : 'border-gray-200 hover:bg-gray-50'}`}
+                        disabled={loading}
+                      >
+                        Artist
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName" className="text-sm font-medium text-gray-700">
+                      Full Name
+                    </Label>
+                    <Input
+                      id="fullName"
+                      placeholder="Enter your full name"
+                      value={fullName}
+                      onChange={e => setFullName(e.target.value)}
+                      disabled={loading}
+                      className="h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {userType === "artist" && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="artType" className="text-sm font-medium text-gray-700">
+                          Art Specialty
+                        </Label>
+                        <Input
+                          id="artType"
+                          placeholder="e.g. Painter, Sculptor, Digital Artist"
+                          value={artType}
+                          onChange={e => setArtType(e.target.value)}
+                          disabled={loading}
+                          className="h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="district" className="text-sm font-medium text-gray-700">
+                          Location
+                        </Label>
+                        <Input
+                          id="district"
+                          placeholder="Your city or district"
+                          value={district}
+                          onChange={e => setDistrict(e.target.value)}
+                          disabled={loading}
+                          className="h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                        />
+                      </div>
+                    </>
+                  )}
                 </>
               )}
-            </>
-          )}
 
-          {error && (
-            <div className="bg-red-100 text-red-700 p-2 rounded text-sm">{error}</div>
-          )}
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
 
-          <Button type="submit" className="mt-2 w-full">
-            {loading
-              ? (authMode === "sign-in" ? "Signing In..." : "Signing Up...")
-              : (authMode === "sign-in" ? "Sign In" : "Sign Up")}
-          </Button>
-        </form>
-        <div className="mt-4">
-          <Badge>
-            {authMode === "sign-in"
-              ? "Don’t have an account? Sign up above."
-              : "Already have an account? Click Sign In above."}
-          </Badge>
-        </div>
-      </Card>
+              <Button 
+                type="submit" 
+                className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-medium"
+                disabled={loading}
+              >
+                {loading
+                  ? (authMode === "sign-in" ? "Signing in..." : "Creating account...")
+                  : (authMode === "sign-in" ? "Sign In" : "Create Account")}
+              </Button>
+            </form>
+
+            <div className="text-center text-sm text-gray-600 mt-6">
+              {authMode === "sign-in" ? (
+                <>
+                  Don't have an account?{" "}
+                  <button
+                    onClick={() => setAuthMode("sign-up")}
+                    className="text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    Sign up
+                  </button>
+                </>
+              ) : (
+                <>
+                  Already have an account?{" "}
+                  <button
+                    onClick={() => setAuthMode("sign-in")}
+                    className="text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    Sign in
+                  </button>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
