@@ -13,6 +13,7 @@ import Search from "./pages/Search";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
+import CompleteArtistProfile from "./pages/CompleteArtistProfile";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,7 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
+            <Route path="/complete-artist-profile" element={<ProtectedRoute requireAuth={true} userType="artist"><CompleteArtistProfile /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

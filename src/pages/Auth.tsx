@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -7,11 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/use-toast";
 
 type AuthMode = "sign-in" | "sign-up";
 
 const Auth: React.FC = () => {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, signInWithGoogle } = useAuth();
   const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,6 +27,9 @@ const Auth: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
+
+  // new state for tracking Google sign-in with artist selection
+  const [pendingArtistGoogle, setPendingArtistGoogle] = useState(false);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,6 +115,38 @@ const Auth: React.FC = () => {
       // Show a toast or message: "Check your email to confirm registration." (handled in AuthContext)
     }
   };
+
+  const handleGoogleLogin = async () => {
+    if (authMode === "sign-up" && userType === "") {
+      setError("Please select Artist or Customer before signing up with Google.");
+      return;
+    }
+    setLoading(true);
+    const { error } = await signInWithGoogle(); // using AuthContext
+    setLoading(false);
+
+    // normal redirect will be handled in useEffect below
+    if (error) {
+      setError(error.message || "Google Sign-in failed");
+    } else if (authMode === "sign-up" && userType === "artist") {
+      setPendingArtistGoogle(true);
+    }
+  };
+
+  // monitor session/profile to redirect artist users to complete profile
+  const { profile, user } = useAuth();
+
+  useEffect(() => {
+    // After Google sign in, if new artist, route to profile form
+    // If using sign-up, userType=artist, and Google flow just finished
+    if (pendingArtistGoogle && userType === "artist") {
+      // Check if artist profile is missing fields or just redirect
+      navigate("/complete-artist-profile");
+      setPendingArtistGoogle(false);
+    } else if (user && profile && authMode === "sign-in") {
+      navigate("/");
+    }
+  }, [user, profile, authMode, userType, pendingArtistGoogle, navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center p-4">
@@ -273,6 +308,19 @@ const Auth: React.FC = () => {
                   ? (authMode === "sign-in" ? "Signing in..." : "Creating account...")
                   : (authMode === "sign-in" ? "Sign In" : "Create Account")}
               </Button>
+
+              {/* Google Sign-In Button */}
+              <div className="flex items-center justify-center mt-4">
+                <Button
+                  type="button"
+                  className="w-full h-11 flex items-center gap-2 bg-white border border-gray-200 text-gray-700 shadow hover:bg-blue-50 transition"
+                  onClick={handleGoogleLogin}
+                  disabled={loading}
+                >
+                  <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
+                  {authMode === "sign-in" ? "Sign in with Google" : "Sign up with Google"}
+                </Button>
+              </div>
             </form>
 
             <div className="text-center text-sm text-gray-600 mt-6">
