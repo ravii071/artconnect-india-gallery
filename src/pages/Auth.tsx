@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthForm } from "@/components/auth/AuthForm";
-import { SelectRole } from "./SelectRole";
+import SelectRole from "./SelectRole";
 import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 
 const Auth: React.FC = () => {
