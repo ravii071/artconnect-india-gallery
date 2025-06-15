@@ -4,11 +4,12 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthForm } from "@/components/auth/AuthForm";
+import { RoleSelectionModal } from "@/components/auth/RoleSelectionModal";
 import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 
 const Auth: React.FC = () => {
   const { signIn, signUp, profile, user } = useAuth();
-  const { handleGoogleSignIn, pendingGoogleSignUp } = useGoogleAuth();
+  const { handleGoogleSignIn, handleRoleSelection, pendingGoogleSignUp, showRoleSelection } = useGoogleAuth();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [artistProfile, setArtistProfile] = useState<any>(null);
@@ -76,10 +77,14 @@ const Auth: React.FC = () => {
 
           const user_id = user.user.id;
 
-          // Update profiles with full name and user_type
+          // Update profiles with full name, user_type, and completion status
           await supabase
             .from("profiles")
-            .update({ full_name: data.fullName, user_type: data.userType })
+            .update({ 
+              full_name: data.fullName, 
+              user_type: data.userType,
+              is_profile_complete: data.userType === "client" // clients are complete by default
+            })
             .eq("id", user_id);
 
           // If artist, also ensure artist_profiles row exists
@@ -124,33 +129,40 @@ const Auth: React.FC = () => {
 
   // Handle normal sign-in flow redirection (only if not in Google sign-up flow)
   useEffect(() => {
-    if (user && profile && !pendingGoogleSignUp) {
+    if (user && profile && !pendingGoogleSignUp && !showRoleSelection) {
       if (profile.user_type === "artist") {
-        // Check for essential info in artist profile
-        if (
-          !artistProfile ||
-          !artistProfile.specialty ||
-          !artistProfile.location ||
-          artistProfile.specialty.trim() === "" ||
-          artistProfile.location.trim() === ""
-        ) {
+        // Check if profile is complete
+        if (!profile.is_profile_complete || 
+            !artistProfile ||
+            !artistProfile.specialty ||
+            !artistProfile.location ||
+            artistProfile.specialty.trim() === "" ||
+            artistProfile.location.trim() === "") {
           navigate("/complete-artist-profile");
         } else {
-          navigate("/");
+          navigate("/dashboard");
         }
       } else if (profile.user_type === "client") {
-        navigate("/");
+        navigate("/home");
       }
     }
-  }, [user, profile, artistProfile, pendingGoogleSignUp, navigate]);
+  }, [user, profile, artistProfile, pendingGoogleSignUp, showRoleSelection, navigate]);
 
   return (
-    <AuthForm
-      onSubmit={handleAuth}
-      onGoogleSignIn={handleGoogleAuth}
-      loading={loading}
-      error={error}
-    />
+    <>
+      <AuthForm
+        onSubmit={handleAuth}
+        onGoogleSignIn={handleGoogleAuth}
+        loading={loading}
+        error={error}
+      />
+      
+      <RoleSelectionModal
+        open={showRoleSelection}
+        onRoleSelect={handleRoleSelection}
+        loading={loading}
+      />
+    </>
   );
 };
 

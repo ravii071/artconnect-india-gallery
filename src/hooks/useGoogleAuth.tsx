@@ -8,6 +8,7 @@ export const useGoogleAuth = () => {
   const { user, profile, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [pendingGoogleSignUp, setPendingGoogleSignUp] = useState(false);
+  const [showRoleSelection, setShowRoleSelection] = useState(false);
 
   const handleGoogleSignIn = async (authMode: "sign-in" | "sign-up", userType?: "artist" | "client") => {
     if (authMode === "sign-up" && userType) {
@@ -22,6 +23,56 @@ export const useGoogleAuth = () => {
       localStorage.removeItem("pendingGoogleSignUp");
       setPendingGoogleSignUp(false);
       throw error;
+    }
+  };
+
+  const handleRoleSelection = async (userType: "artist" | "client") => {
+    if (!user) return;
+
+    try {
+      // Update profile with user type
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ 
+          user_type: userType,
+          is_profile_complete: userType === "client" // clients are complete by default
+        })
+        .eq("id", user.id);
+
+      if (profileError) {
+        console.error("Error updating profile:", profileError);
+        return;
+      }
+
+      // If artist, create artist profile and redirect to complete profile
+      if (userType === "artist") {
+        const { error: artistError } = await supabase
+          .from("artist_profiles")
+          .upsert(
+            {
+              id: user.id,
+              specialty: "",
+              location: "",
+              bio: "",
+              phone: "",
+              portfolio_images: [],
+            },
+            { onConflict: "id" }
+          );
+
+        if (artistError) {
+          console.error("Error creating artist profile:", artistError);
+        }
+
+        setShowRoleSelection(false);
+        navigate("/complete-artist-profile");
+      } else {
+        // Customer - redirect to home
+        setShowRoleSelection(false);
+        navigate("/home");
+      }
+    } catch (error) {
+      console.error("Error in role selection:", error);
     }
   };
 
@@ -40,7 +91,10 @@ export const useGoogleAuth = () => {
           // Update profile with user type
           const { error: profileError } = await supabase
             .from("profiles")
-            .update({ user_type: pendingUserType })
+            .update({ 
+              user_type: pendingUserType,
+              is_profile_complete: pendingUserType === "client" // clients are complete by default
+            })
             .eq("id", user.id);
 
           if (profileError) {
@@ -83,12 +137,17 @@ export const useGoogleAuth = () => {
             setPendingGoogleSignUp(false);
             
             console.log("Redirecting customer to home");
-            navigate("/");
+            navigate("/home");
             return;
           }
         } catch (error) {
           console.error("Error in Google sign-up flow:", error);
         }
+      }
+
+      // Check if user needs role selection (Google OAuth without prior role selection)
+      if (user && profile && !profile.user_type && !isGoogleSignUp) {
+        setShowRoleSelection(true);
       }
     };
 
@@ -97,6 +156,8 @@ export const useGoogleAuth = () => {
 
   return {
     handleGoogleSignIn,
-    pendingGoogleSignUp
+    handleRoleSelection,
+    pendingGoogleSignUp,
+    showRoleSelection
   };
 };

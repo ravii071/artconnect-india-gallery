@@ -30,29 +30,39 @@ const CompleteArtistProfile = () => {
     e.preventDefault();
     setLoading(true);
 
-    // update artist_profiles table
-    const { error } = await supabase
-      .from("artist_profiles")
-      .upsert({
-        id: user.id,
-        specialty: artType,
-        location: district,
-        bio: "",
-        phone: "",
-        portfolio_images: [],
-      }, { onConflict: "id" });
+    try {
+      // Update artist_profiles table
+      const { error: artistError } = await supabase
+        .from("artist_profiles")
+        .upsert({
+          id: user.id,
+          specialty: artType,
+          location: district,
+          bio: "",
+          phone: "",
+          portfolio_images: [],
+        }, { onConflict: "id" });
 
-    setLoading(false);
+      if (artistError) throw artistError;
 
-    if (error) {
+      // Mark profile as complete
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ is_profile_complete: true })
+        .eq("id", user.id);
+
+      if (profileError) throw profileError;
+
+      toast({ title: "Profile updated successfully!" });
+      navigate("/dashboard");
+    } catch (error: any) {
       toast({
         title: "Failed to save artist info",
         description: error.message,
         variant: "destructive"
       });
-    } else {
-      toast({ title: "Profile updated" });
-      navigate("/");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -63,13 +73,23 @@ const CompleteArtistProfile = () => {
         <form className="space-y-4" onSubmit={handleSave}>
           <div>
             <Label htmlFor="artType">Art Specialty</Label>
-            <Input id="artType" placeholder="e.g. Painter, Sculptor, Digital Artist"
-              value={artType} onChange={e => setArtType(e.target.value)} required />
+            <Input 
+              id="artType" 
+              placeholder="e.g. Painter, Sculptor, Digital Artist"
+              value={artType} 
+              onChange={e => setArtType(e.target.value)} 
+              required 
+            />
           </div>
           <div>
             <Label htmlFor="district">Location</Label>
-            <Input id="district" placeholder="Your city or district"
-              value={district} onChange={e => setDistrict(e.target.value)} required />
+            <Input 
+              id="district" 
+              placeholder="Your city or district"
+              value={district} 
+              onChange={e => setDistrict(e.target.value)} 
+              required 
+            />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Saving..." : "Save and Continue"}
