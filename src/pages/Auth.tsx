@@ -11,7 +11,9 @@ import { toast } from "@/components/ui/use-toast";
 type AuthMode = "sign-in" | "sign-up";
 
 const Auth: React.FC = () => {
-  const { signIn, signUp, signInWithGoogle } = useAuth();
+  // Move this line here: MUST be placed at the top before any usage of user or profile!
+  const { signIn, signUp, signInWithGoogle, profile, user } = useAuth();
+
   const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -155,7 +157,6 @@ const Auth: React.FC = () => {
   };
 
   // monitor session/profile to redirect artist users to complete profile
-  const { profile, user } = useAuth();
 
   useEffect(() => {
     // After Google sign in, if new artist, route to profile form
@@ -396,5 +397,4 @@ const Auth: React.FC = () => {
     </div>
   );
 };
-
 export default Auth;
