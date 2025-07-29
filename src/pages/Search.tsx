@@ -87,7 +87,30 @@ const Search = () => {
       }
       setLoading(false);
     };
+
     fetchArtists();
+
+    // Set up realtime subscription for artist profile changes
+    const channel = supabase
+      .channel('artist-search-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'artist_profiles'
+        },
+        (payload) => {
+          console.log('Artist profile changed in search:', payload);
+          // Refetch artists when any artist profile changes
+          fetchArtists();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Map category and location from id back to value for searching

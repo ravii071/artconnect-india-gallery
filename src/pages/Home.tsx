@@ -32,6 +32,28 @@ const Home = () => {
 
   useEffect(() => {
     fetchArtists();
+
+    // Set up realtime subscription for artist profile changes
+    const channel = supabase
+      .channel('artist-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'artist_profiles'
+        },
+        (payload) => {
+          console.log('Artist profile changed:', payload);
+          // Refetch artists when any artist profile changes
+          fetchArtists();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchArtists = async () => {
