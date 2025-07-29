@@ -30,7 +30,6 @@ const Auth: React.FC = () => {
     }
   }, [user, profile, navigate]);
 
-  // Simplified: only email/password, no role
   const handleAuth = async (data: any) => {
     setError(null);
     setLoading(true);
@@ -39,6 +38,15 @@ const Auth: React.FC = () => {
         const { error } = await signIn(data.email, data.password);
         if (error) {
           setError(error.message || "Could not sign in");
+        } else if (data.userType) {
+          // Update user type after successful sign-in
+          const { data: userData } = await supabase.auth.getUser();
+          if (userData?.user) {
+            await supabase
+              .from("profiles")
+              .update({ user_type: data.userType })
+              .eq("id", userData.user.id);
+          }
         }
       } else {
         // Email/password sign up flow

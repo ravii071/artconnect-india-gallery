@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 interface SignInFormProps {
-  onSubmit: (data: { email: string; password: string; type: 'sign-in' }) => Promise<void>;
+  onSubmit: (data: { email: string; password: string; type: 'sign-in'; userType: 'artist' | 'client' }) => Promise<void>;
   loading: boolean;
   error: string | null;
 }
@@ -13,14 +13,45 @@ interface SignInFormProps {
 export const SignInForm: React.FC<SignInFormProps> = ({ onSubmit, loading, error }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [userType, setUserType] = useState<'artist' | 'client'>('client');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onSubmit({ email, password, type: 'sign-in' });
+    await onSubmit({ email, password, type: 'sign-in', userType });
   };
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
+      <div className="space-y-3">
+        <Label className="text-sm font-medium text-gray-700">
+          Sign in as
+        </Label>
+        <div className="flex gap-6">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="userType"
+              value="client"
+              checked={userType === 'client'}
+              onChange={(e) => setUserType(e.target.value as 'client' | 'artist')}
+              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700">Customer</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="userType"
+              value="artist"
+              checked={userType === 'artist'}
+              onChange={(e) => setUserType(e.target.value as 'client' | 'artist')}
+              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700">Artist</span>
+          </label>
+        </div>
+      </div>
+
       <div className="space-y-2">
         <Label htmlFor="email" className="text-sm font-medium text-gray-700">
           Email address
