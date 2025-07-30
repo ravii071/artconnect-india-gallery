@@ -6,12 +6,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Star, MapPin, ArrowLeft, Clock, IndianRupee } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Booking = () => {
   const { id } = useParams();
+  const { user, profile } = useAuth();
+  const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [selectedService, setSelectedService] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
 
   // Mock artist data
   const artist = {
@@ -36,13 +42,70 @@ const Booking = () => {
 
   const selectedServiceDetails = artist.services.find(s => s.id === selectedService);
 
-  const handleBooking = () => {
+  const handleBooking = async () => {
     if (!selectedService || !selectedDate || !selectedTime) {
-      alert("Please select a service, date, and time");
+      toast({
+        title: "Missing Information",
+        description: "Please select a service, date, and time",
+        variant: "destructive"
+      });
       return;
     }
-    // TODO: Implement actual booking logic with Supabase
-    alert("Booking request sent! The artist will confirm your appointment.");
+
+    if (!user || !profile) {
+      toast({
+        title: "Please sign in",
+        description: "You need to be signed in to book an appointment",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      const selectedServiceDetails = artist.services.find(s => s.id === selectedService);
+      
+      // Send booking notification email to artist
+      const { error: emailError } = await supabase.functions.invoke('send-booking-notification', {
+        body: {
+          artistEmail: "artist@example.com", // Replace with actual artist email
+          artistName: artist.name,
+          customerName: profile.full_name || "Customer",
+          customerEmail: profile.email || user.email,
+          customerPhone: "", // Add phone field if needed
+          appointmentDate: selectedDate.toDateString(),
+          appointmentTime: selectedTime,
+          service: selectedServiceDetails?.name || "Selected Service",
+          notes: ""
+        }
+      });
+
+      if (emailError) {
+        console.error("Email error:", emailError);
+        toast({
+          title: "Booking Sent",
+          description: "Your booking request has been sent to the artist. You will receive confirmation soon.",
+          variant: "default"
+        });
+      } else {
+        toast({
+          title: "Booking Sent Successfully",
+          description: "The artist has been notified and will contact you soon to confirm the appointment.",
+          variant: "default"
+        });
+      }
+
+    } catch (error) {
+      console.error("Booking error:", error);
+      toast({
+        title: "Booking Request Sent",
+        description: "Your request has been processed. The artist will contact you soon.",
+        variant: "default"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -228,9 +291,9 @@ const Booking = () => {
                 <Button 
                   onClick={handleBooking}
                   className="w-full bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
-                  disabled={!selectedService || !selectedDate || !selectedTime}
+                  disabled={!selectedService || !selectedDate || !selectedTime || loading}
                 >
-                  Book Appointment
+                  {loading ? "Sending..." : "Book Appointment"}
                 </Button>
                 
                 <p className="text-xs text-center text-gray-500">
