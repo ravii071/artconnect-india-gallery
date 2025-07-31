@@ -1,17 +1,39 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Palette, User } from "lucide-react";
+
+interface ArtForm {
+  id: number;
+  name: string;
+  description: string;
+}
 
 const SelectRole: React.FC = () => {
   const [role, setRole] = useState<"artist" | "client" | null>(null);
+  const [artForms, setArtForms] = useState<ArtForm[]>([]);
+  const [selectedArtForm, setSelectedArtForm] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+
+  // Fetch art forms for artist selection
+  useEffect(() => {
+    const fetchArtForms = async () => {
+      const { data } = await supabase
+        .from("art_forms")
+        .select("*")
+        .order("name");
+      if (data) setArtForms(data);
+    };
+    fetchArtForms();
+  }, []);
 
   // Only accessible to authenticated users without a role
   if (!user) {
@@ -30,6 +52,8 @@ const SelectRole: React.FC = () => {
 
   const handleContinue = async () => {
     if (!role) return;
+    if (role === "artist" && !selectedArtForm) return;
+    
     setLoading(true);
 
     // Update role in Supabase
@@ -42,10 +66,12 @@ const SelectRole: React.FC = () => {
       .eq("id", user.id);
 
     if (role === "artist") {
-      // Make sure artist_profiles exists for this artist
+      // Create artist profile with selected art form
+      const selectedArtFormData = artForms.find(af => af.id.toString() === selectedArtForm);
       await supabase.from("artist_profiles").upsert({
         id: user.id,
-        specialty: "",
+        specialty: selectedArtFormData?.name || "",
+        art_form_id: parseInt(selectedArtForm),
         location: "",
         bio: "",
         phone: "",
@@ -96,9 +122,33 @@ const SelectRole: React.FC = () => {
             <div className="text-gray-500 text-sm mt-1">Find and book great artists</div>
           </button>
         </div>
+        
+        {role === "artist" && (
+          <div className="space-y-2">
+            <Label htmlFor="artForm" className="text-sm font-medium">
+              Select your art form
+            </Label>
+            <Select value={selectedArtForm} onValueChange={setSelectedArtForm}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Choose your specialty" />
+              </SelectTrigger>
+              <SelectContent>
+                {artForms.map((artForm) => (
+                  <SelectItem key={artForm.id} value={artForm.id.toString()}>
+                    <div>
+                      <div className="font-medium">{artForm.name}</div>
+                      <div className="text-sm text-gray-500">{artForm.description}</div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        
         <Button
           className="w-full mt-6"
-          disabled={!role || loading}
+          disabled={!role || (role === "artist" && !selectedArtForm) || loading}
           onClick={handleContinue}
         >
           {loading ? "Saving..." : "Continue"}

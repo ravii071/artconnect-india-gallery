@@ -17,6 +17,9 @@ interface ArtistProfile {
   portfolio_images: string[];
   rating: number;
   total_reviews: number;
+  art_forms: {
+    name: string;
+  } | null;
   profiles: {
     full_name: string;
     avatar_url: string;
@@ -68,6 +71,9 @@ const Home = () => {
           portfolio_images,
           rating,
           total_reviews,
+          art_forms (
+            name
+          ),
           profiles!inner(
             full_name,
             avatar_url
@@ -86,6 +92,7 @@ const Home = () => {
 
   const filteredArtists = artists.filter(artist =>
     artist.specialty.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    artist.art_forms?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     artist.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     artist.profiles.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -167,7 +174,7 @@ const Home = () => {
                     {artist.profiles.full_name}
                   </CardTitle>
                 </div>
-                <Badge variant="secondary">{artist.specialty}</Badge>
+                <Badge variant="secondary">{artist.art_forms?.name || artist.specialty}</Badge>
               </CardHeader>
               
               <CardContent>

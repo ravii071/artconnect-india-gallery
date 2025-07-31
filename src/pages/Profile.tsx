@@ -13,6 +13,8 @@ interface ArtistProfileData {
   location: string | null;
   phone: string | null;
   portfolio_images: string[] | null;
+  art_form_id: number | null;
+  art_form_name?: string;
 }
 
 const Profile = () => {
@@ -32,7 +34,12 @@ const Profile = () => {
     if (profile?.user_type === "artist" && user) {
       supabase
         .from("artist_profiles")
-        .select("*")
+        .select(`
+          *,
+          art_forms (
+            name
+          )
+        `)
         .eq("id", user.id)
         .maybeSingle()
         .then(({ data }) => {
@@ -43,6 +50,8 @@ const Profile = () => {
               location: data.location || "",
               phone: data.phone || "",
               portfolio_images: data.portfolio_images || [],
+              art_form_id: data.art_form_id,
+              art_form_name: data.art_forms?.name,
             });
             setBio(data.bio || "");
             setSpecialty(data.specialty || "");
@@ -173,8 +182,8 @@ const Profile = () => {
               </div>
             ) : (
               <div>
+                <div className="mb-3"><b>Art Form:</b> <span className="text-gray-700">{artistProfile?.art_form_name || specialty || "Not set"}</span></div>
                 <div className="mb-3"><b>Bio:</b> <span className="text-gray-700">{bio || "No bio"}</span></div>
-                <div className="mb-3"><b>Specialty:</b> <span className="text-gray-700">{specialty || "Not set"}</span></div>
                 <div className="mb-3"><b>Location:</b> <span className="text-gray-700">{location || "Not set"}</span></div>
                 <div className="mb-3"><b>Phone:</b> <span className="text-gray-700">{phone || "Not set"}</span></div>
                 <div className="my-6">

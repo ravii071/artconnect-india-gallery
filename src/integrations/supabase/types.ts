@@ -14,8 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      art_forms: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: number
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: number
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: number
+          name?: string
+        }
+        Relationships: []
+      }
       artist_profiles: {
         Row: {
+          art_form_id: number | null
           bio: string | null
           created_at: string
           id: string
@@ -29,6 +51,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          art_form_id?: number | null
           bio?: string | null
           created_at?: string
           id: string
@@ -42,6 +65,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          art_form_id?: number | null
           bio?: string | null
           created_at?: string
           id?: string
@@ -55,6 +79,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "artist_profiles_art_form_id_fkey"
+            columns: ["art_form_id"]
+            isOneToOne: false
+            referencedRelation: "art_forms"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "artist_profiles_id_fkey"
             columns: ["id"]
