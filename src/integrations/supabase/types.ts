@@ -95,6 +95,66 @@ export type Database = {
           },
         ]
       }
+      bookings: {
+        Row: {
+          appointment_date: string
+          appointment_time: string
+          artist_id: string
+          created_at: string
+          customer_id: string
+          id: string
+          location: string | null
+          notes: string | null
+          service_name: string
+          status: string
+          total_amount: number | null
+          updated_at: string
+        }
+        Insert: {
+          appointment_date: string
+          appointment_time: string
+          artist_id: string
+          created_at?: string
+          customer_id: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          service_name: string
+          status?: string
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Update: {
+          appointment_date?: string
+          appointment_time?: string
+          artist_id?: string
+          created_at?: string
+          customer_id?: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          service_name?: string
+          status?: string
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
