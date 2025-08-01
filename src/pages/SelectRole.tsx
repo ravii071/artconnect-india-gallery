@@ -1,158 +1,219 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Palette, User } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 
 interface ArtForm {
   id: number;
   name: string;
-  description: string;
 }
 
-const SelectRole: React.FC = () => {
-  const [role, setRole] = useState<"artist" | "client" | null>(null);
-  const [artForms, setArtForms] = useState<ArtForm[]>([]);
-  const [selectedArtForm, setSelectedArtForm] = useState<string>("");
-  const [loading, setLoading] = useState(false);
-  const { user, profile } = useAuth();
+const SelectRole = () => {
+  const { user, updateProfile } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [selectedRole, setSelectedRole] = useState<"client" | "artist" | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [artForms, setArtForms] = useState<ArtForm[]>([]);
+  
+  // Artist-specific fields
+  const [artistData, setArtistData] = useState({
+    artFormId: "",
+    specialty: "",
+    bio: "",
+    location: "",
+    phone: "",
+    startingPrice: ""
+  });
 
-  // Fetch art forms for artist selection
   useEffect(() => {
-    const fetchArtForms = async () => {
-      const { data } = await supabase
-        .from("art_forms")
-        .select("*")
-        .order("name");
-      if (data) setArtForms(data);
-    };
     fetchArtForms();
   }, []);
 
-  // Only accessible to authenticated users without a role
-  if (!user) {
-    navigate("/auth");
-    return null;
-  }
-  if (profile && profile.user_type) {
-    // Already have a role assigned
-    if (profile.user_type === "artist") {
-      navigate("/dashboard");
-    } else {
-      navigate("/home");
+  const fetchArtForms = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("art_forms")
+        .select("id, name")
+        .order("name");
+      
+      if (error) throw error;
+      setArtForms(data || []);
+    } catch (error) {
+      console.error("Error fetching art forms:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load art forms",
+        variant: "destructive",
+      });
     }
-    return null;
-  }
+  };
 
-  const handleContinue = async () => {
-    if (!role) return;
-    if (role === "artist" && !selectedArtForm) return;
+  const handleRoleSelect = async () => {
+    if (!selectedRole) return;
     
     setLoading(true);
+    try {
+      // Update user type in profiles
+      await updateProfile({
+        user_type: selectedRole,
+        is_profile_complete: selectedRole === "client"
+      });
 
-    // Update role in Supabase
-    await supabase
-      .from("profiles")
-      .update({
-        user_type: role,
-        is_profile_complete: role === "client"
-      })
-      .eq("id", user.id);
+      if (selectedRole === "artist") {
+        // Validate artist data
+        if (!artistData.artFormId || !artistData.specialty || !artistData.location) {
+          toast({
+            title: "Missing Information",
+            description: "Please fill in all required fields for artist profile",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
 
-    if (role === "artist") {
-      // Create artist profile with selected art form
-      const selectedArtFormData = artForms.find(af => af.id.toString() === selectedArtForm);
-      await supabase.from("artist_profiles").upsert({
-        id: user.id,
-        specialty: selectedArtFormData?.name || "",
-        art_form_id: parseInt(selectedArtForm),
-        location: "",
-        bio: "",
-        phone: "",
-        portfolio_images: []
-      }, { onConflict: "id" });
+        // Create artist profile
+        const { error: artistError } = await supabase
+          .from("artist_profiles")
+          .insert({
+            id: user?.id,
+            art_form_id: parseInt(artistData.artFormId),
+            specialty: artistData.specialty,
+            bio: artistData.bio,
+            location: artistData.location,
+            phone: artistData.phone,
+            starting_price: artistData.startingPrice
+          });
 
-      navigate("/complete-artist-profile");
-    } else {
-      navigate("/home");
+        if (artistError) throw artistError;
+        
+        navigate("/dashboard");
+      } else {
+        navigate("/home");
+      }
+    } catch (error: any) {
+      console.error("Error updating role:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update profile",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-4">
-      <Card className="w-full max-w-md p-8 rounded-lg shadow-lg space-y-6">
-        <h1 className="text-2xl font-bold text-center mb-2">Welcome! Who are you?</h1>
-        <p className="text-center text-gray-600 mb-4">
-          Please select your role to continue.
-        </p>
-        <div className="flex flex-col gap-4">
-          <button
-            className={`w-full transition-all rounded-lg border p-4 flex flex-col items-center cursor-pointer ${
-              role === "artist"
-                ? "ring-2 ring-blue-500 bg-blue-50"
-                : "hover:bg-gray-50 border-gray-200"
-            }`}
-            onClick={() => setRole("artist")}
-            type="button"
-            disabled={loading}
-          >
-            <Palette className="text-blue-600 w-10 h-10 mb-1" />
-            <div className="font-semibold">I'm an Artist</div>
-            <div className="text-gray-500 text-sm mt-1">Showcase your art and get bookings</div>
-          </button>
-          <button
-            className={`w-full transition-all rounded-lg border p-4 flex flex-col items-center cursor-pointer ${
-              role === "client"
-                ? "ring-2 ring-green-500 bg-green-50"
-                : "hover:bg-gray-50 border-gray-200"
-            }`}
-            onClick={() => setRole("client")}
-            type="button"
-            disabled={loading}
-          >
-            <User className="text-green-600 w-10 h-10 mb-1" />
-            <div className="font-semibold">I'm a Customer</div>
-            <div className="text-gray-500 text-sm mt-1">Find and book great artists</div>
-          </button>
-        </div>
-        
-        {role === "artist" && (
-          <div className="space-y-2">
-            <Label htmlFor="artForm" className="text-sm font-medium">
-              Select your art form
-            </Label>
-            <Select value={selectedArtForm} onValueChange={setSelectedArtForm}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Choose your specialty" />
-              </SelectTrigger>
-              <SelectContent>
-                {artForms.map((artForm) => (
-                  <SelectItem key={artForm.id} value={artForm.id.toString()}>
-                    <div>
-                      <div className="font-medium">{artForm.name}</div>
-                      <div className="text-sm text-gray-500">{artForm.description}</div>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="text-center text-2xl">Choose Your Role</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            <Button
+              variant={selectedRole === "client" ? "default" : "outline"}
+              onClick={() => setSelectedRole("client")}
+              className="h-20 flex flex-col"
+            >
+              <span className="text-2xl mb-1">👥</span>
+              <span>Client</span>
+            </Button>
+            <Button
+              variant={selectedRole === "artist" ? "default" : "outline"}
+              onClick={() => setSelectedRole("artist")}
+              className="h-20 flex flex-col"
+            >
+              <span className="text-2xl mb-1">🎨</span>
+              <span>Artist</span>
+            </Button>
           </div>
-        )}
-        
-        <Button
-          className="w-full mt-6"
-          disabled={!role || (role === "artist" && !selectedArtForm) || loading}
-          onClick={handleContinue}
-        >
-          {loading ? "Saving..." : "Continue"}
-        </Button>
+
+          {selectedRole === "artist" && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="artForm">Art Form *</Label>
+                <Select value={artistData.artFormId} onValueChange={(value) => setArtistData(prev => ({ ...prev, artFormId: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select your art form" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {artForms.map((form) => (
+                      <SelectItem key={form.id} value={form.id.toString()}>
+                        {form.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="specialty">Specialty *</Label>
+                <Input
+                  id="specialty"
+                  placeholder="e.g., Bridal Makeup, Wedding Mehendi"
+                  value={artistData.specialty}
+                  onChange={(e) => setArtistData(prev => ({ ...prev, specialty: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="location">Location *</Label>
+                <Input
+                  id="location"
+                  placeholder="e.g., Mumbai, Maharashtra"
+                  value={artistData.location}
+                  onChange={(e) => setArtistData(prev => ({ ...prev, location: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  placeholder="Your contact number"
+                  value={artistData.phone}
+                  onChange={(e) => setArtistData(prev => ({ ...prev, phone: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="startingPrice">Starting Price</Label>
+                <Input
+                  id="startingPrice"
+                  placeholder="e.g., ₹2000 onwards"
+                  value={artistData.startingPrice}
+                  onChange={(e) => setArtistData(prev => ({ ...prev, startingPrice: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="bio">Bio</Label>
+                <Textarea
+                  id="bio"
+                  placeholder="Tell customers about yourself and your work..."
+                  value={artistData.bio}
+                  onChange={(e) => setArtistData(prev => ({ ...prev, bio: e.target.value }))}
+                />
+              </div>
+            </div>
+          )}
+
+          <Button 
+            onClick={handleRoleSelect}
+            disabled={!selectedRole || loading}
+            className="w-full"
+          >
+            {loading ? "Setting up..." : "Continue"}
+          </Button>
+        </CardContent>
       </Card>
     </div>
   );

@@ -9,7 +9,7 @@ import Index from "./pages/Index";
 import Home from "./pages/Home";
 import ArtistProfile from "./pages/ArtistProfile";
 import Auth from "./pages/Auth";
-import Booking from "./pages/Booking";
+import BookingPage from "./pages/BookingPage";
 import Search from "./pages/Search";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
@@ -37,9 +37,9 @@ const App = () => (
               path="/booking/:id" 
               element={
                 <ProtectedRoute requireAuth={true}>
-                  <Booking />
+                  <BookingPage />
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route path="/search" element={<Search />} />
             <Route 
