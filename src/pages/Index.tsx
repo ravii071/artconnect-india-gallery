@@ -87,10 +87,16 @@ const Index = () => {
                 <span className="text-sm text-gray-600">
                   Welcome, {profile?.full_name || user.email}
                 </span>
-                {profile?.user_type === 'artist' && (
+                {profile?.user_type === 'artist' ? (
                   <Link to="/dashboard">
                     <Button variant="outline" size="sm">
                       Dashboard
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link to="/home">
+                    <Button variant="outline" size="sm">
+                      Browse Artists
                     </Button>
                   </Link>
                 )}
