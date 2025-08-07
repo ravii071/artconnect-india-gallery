@@ -90,13 +90,13 @@ const Index = () => {
                 {profile?.user_type === 'artist' ? (
                   <Link to="/dashboard">
                     <Button variant="outline" size="sm">
-                      Dashboard
+                      Artist Dashboard
                     </Button>
                   </Link>
                 ) : (
-                  <Link to="/home">
+                  <Link to="/customer-dashboard">
                     <Button variant="outline" size="sm">
-                      Browse Artists
+                      My Dashboard
                     </Button>
                   </Link>
                 )}

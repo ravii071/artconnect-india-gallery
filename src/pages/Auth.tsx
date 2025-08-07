@@ -21,7 +21,7 @@ const Auth: React.FC = () => {
         if (profile.user_type === "artist") {
           navigate("/dashboard");
         } else {
-          navigate("/home");
+          navigate("/customer-dashboard");
         }
       }
     }

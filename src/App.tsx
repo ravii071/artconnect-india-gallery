@@ -11,7 +11,8 @@ import ArtistProfile from "./pages/ArtistProfile";
 import Auth from "./pages/Auth";
 import BookingPage from "./pages/BookingPage";
 import Search from "./pages/Search";
-import Dashboard from "./pages/Dashboard";
+import CustomerDashboard from "./pages/CustomerDashboard";
+import ArtistDashboard from "./pages/ArtistDashboard";
 import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
 import CompleteArtistProfile from "./pages/CompleteArtistProfile";
@@ -46,7 +47,15 @@ const App = () => (
               path="/dashboard" 
               element={
                 <ProtectedRoute requireAuth={true} userType="artist">
-                  <Dashboard />
+                  <ArtistDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/customer-dashboard" 
+              element={
+                <ProtectedRoute requireAuth={true} userType="client">
+                  <CustomerDashboard />
                 </ProtectedRoute>
               } 
             />
