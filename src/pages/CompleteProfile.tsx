@@ -22,10 +22,15 @@ const CompleteProfile: React.FC = () => {
       if (profile.user_type === "artist") {
         navigate("/dashboard");
       } else {
-        navigate("/home");
+        navigate("/customer-dashboard");
       }
     }
-  }, [profile, navigate]);
+    
+    // Set the role if user already has a user_type
+    if (profile && profile.user_type && !role) {
+      setRole(profile.user_type as "artist" | "client");
+    }
+  }, [profile, navigate, role]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +71,7 @@ const CompleteProfile: React.FC = () => {
         }, { onConflict: "id" });
         navigate("/dashboard");
       } else {
-        navigate("/home");
+        navigate("/customer-dashboard");
       }
     } catch (err: any) {
       setError(err.message || "Failed to complete profile.");
