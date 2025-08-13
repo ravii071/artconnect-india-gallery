@@ -59,6 +59,7 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
+            <Route path="/select-role" element={<ProtectedRoute requireAuth={true}><SelectRole /></ProtectedRoute>} />
             <Route path="/complete-artist-profile" element={<ProtectedRoute requireAuth={true} userType="artist"><CompleteArtistProfile /></ProtectedRoute>} />
             <Route path="/complete-profile" element={<ProtectedRoute requireAuth={true}><CompleteProfile /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />

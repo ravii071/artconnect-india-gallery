@@ -18,7 +18,7 @@ const Auth: React.FC = () => {
       console.log('User authenticated, redirecting...', { user: user.id, profile: profile.user_type, isComplete: profile.is_profile_complete });
       
       if (!profile.is_profile_complete) {
-        navigate("/complete-profile");
+        navigate("/select-role");
       } else {
         // Redirect to appropriate dashboard based on user type
         if (profile.user_type === "artist") {
