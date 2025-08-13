@@ -12,15 +12,21 @@ const Auth: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Redirect after login
+  // Redirect after login based on user type and profile completion
   useEffect(() => {
-    if (user) {
-      if (!profile || !profile.is_profile_complete) {
+    if (user && profile) {
+      console.log('User authenticated, redirecting...', { user: user.id, profile: profile.user_type, isComplete: profile.is_profile_complete });
+      
+      if (!profile.is_profile_complete) {
         navigate("/complete-profile");
       } else {
+        // Redirect to appropriate dashboard based on user type
         if (profile.user_type === "artist") {
           navigate("/dashboard");
+        } else if (profile.user_type === "client") {
+          navigate("/customer-dashboard");
         } else {
+          // Default fallback to customer dashboard
           navigate("/customer-dashboard");
         }
       }
